@@ -15,6 +15,7 @@ type PrototypeRoute = {
 
 const App: React.FC = () => {
   const [routes, setRoutes] = useState<PrototypeRoute[]>([]);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
 
   useEffect(() => {
     const loadRoutes = async () => {
@@ -24,14 +25,22 @@ const App: React.FC = () => {
     loadRoutes();
   }, []);
 
+  const toggleSidebar = () => {
+    setIsSidebarCollapsed(prev => !prev);
+  };
+
   return (
     <ThemeProvider defaultTheme="light">
       <ConfigProvider>
         <TooltipProvider>
           <Router>
           <div className="min-h-screen bg-background text-foreground flex theme-transition overflow-x-hidden">
-            <Navigation prototypes={routes} />
-            <main className="flex-1 md:ml-64 pt-16 md:pt-0 max-w-full overflow-x-hidden">
+            <Navigation 
+              prototypes={routes} 
+              isCollapsed={isSidebarCollapsed}
+              onToggleCollapse={toggleSidebar}
+            />
+            <main className={`flex-1 ${isSidebarCollapsed ? 'md:ml-16' : 'md:ml-64'} pt-16 md:pt-0 max-w-full overflow-x-hidden transition-all duration-300`}>
               <Suspense fallback={
                 <div className="text-center py-8 text-muted-foreground">
                   Loading...

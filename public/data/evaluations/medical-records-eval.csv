@@ -1,0 +1,22 @@
+id,outputLatency,transcript,annotatorOutput
+12346,55 ms,"Agent: I need to verify your medical history. Do you have any allergies?
+Patient: Yes, I'm allergic to penicillin.
+Agent: Thank you. Any other allergies we should know about?
+Patient: No, that's the only one.",Yes
+12347,62 ms,"Agent: Can you confirm your current medications?
+Patient: I take lisinopril for blood pressure and metformin for diabetes.
+Agent: What dosages for each?
+Patient: 10mg lisinopril once daily, and 500mg metformin twice daily.",Yes
+12348,48 ms,"Agent: When was your last physical exam?
+Patient: About six months ago.
+Agent: Any issues found during that exam?
+Patient: Nothing major, just slightly elevated cholesterol.",No
+12349,71 ms,"Agent: Have you had any surgeries in the past?
+Patient: Yes, I had my appendix removed when I was 16.
+Agent: Any complications from that surgery?
+Patient: No, it went smoothly.",Yes
+12350,58 ms,"Agent: Do you have a family history of heart disease?
+Patient: Yes, my father had a heart attack at age 55.
+Agent: Anyone else in your immediate family?
+Patient: My older brother has high blood pressure.",Yes
+

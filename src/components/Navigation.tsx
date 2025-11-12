@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ComponentType } from 'react';
-import { Moon, Sun, Code, Settings, X } from 'lucide-react';
+import { Moon, Sun, Code, Settings, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTheme } from '../lib/theme';
 import { useConfig, ConfigControls } from '../lib/config';
 import { SourceCodeModal } from './SourceCodeModal';
@@ -23,9 +23,15 @@ type PrototypeRoute = {
 
 interface NavigationProps {
   prototypes?: PrototypeRoute[];
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
 }
 
-const Navigation: React.FC<NavigationProps> = ({ prototypes = [] }) => {
+const Navigation: React.FC<NavigationProps> = ({ 
+  prototypes = [], 
+  isCollapsed, 
+  onToggleCollapse 
+}) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { theme, toggleTheme } = useTheme();
@@ -72,64 +78,68 @@ const Navigation: React.FC<NavigationProps> = ({ prototypes = [] }) => {
   return (
     <>
       {/* Desktop Sidebar */}
-      <div className="hidden md:flex h-screen w-64 bg-muted fixed left-0 top-0 shadow-md overflow-y-auto theme-transition border-r border-border flex-col">
-        <div className="px-4 py-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-foreground">Prototypes</h2>
+      <div className={`hidden md:flex h-screen ${isCollapsed ? 'w-16' : 'w-64'} bg-muted fixed left-0 top-0 shadow-md overflow-y-auto theme-transition border-r border-border flex-col transition-all duration-300`}>
+        <div className={`${isCollapsed ? 'px-2' : 'px-4'} py-4`}>
+          <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} mb-3`}>
+            {!isCollapsed && <h2 className="text-lg font-semibold text-foreground">Prototypes</h2>}
             <button
-              onClick={toggleTheme}
-              className="p-2 rounded-md bg-background hover:bg-hover theme-transition border border-border"
-              aria-label="Toggle theme"
-              title={`Switch to ${theme.mode === 'light' ? 'dark' : 'light'} mode`}
+              onClick={onToggleCollapse}
+              className="w-[34px] h-[34px] flex items-center justify-center rounded-md bg-background hover:bg-hover theme-transition border border-border flex-shrink-0"
+              aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
-              {theme.mode === 'light' ? (
-                <Moon size={16} className="text-foreground" />
+              {isCollapsed ? (
+                <ChevronRight size={16} className="text-foreground" />
               ) : (
-                <Sun size={16} className="text-foreground" />
+                <ChevronLeft size={16} className="text-foreground" />
               )}
             </button>
           </div>
 
-          {prototypes.length === 0 ? (
-            <div className="text-muted-foreground">Loading prototypes...</div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              <div className="relative">
-                <Select value={selectedPrototype} onValueChange={handlePrototypeChange}>
-                  <SelectTrigger className="w-full bg-background border-border hover:border-input text-foreground">
-                    <SelectValue placeholder="Select a prototype" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover border-border">
-                    {prototypes.map((prototype) => (
-                      <SelectItem
-                        key={prototype.path}
-                        value={prototype.path}
-                        className="text-popover-foreground hover:bg-hover focus:bg-hover"
-                      >
-                        {prototype.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+          {!isCollapsed && (
+            <>
+              {prototypes.length === 0 ? (
+                <div className="text-muted-foreground">Loading prototypes...</div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <div className="relative">
+                    <Select value={selectedPrototype} onValueChange={handlePrototypeChange}>
+                      <SelectTrigger className="w-full bg-background border-border hover:border-input text-foreground">
+                        <SelectValue placeholder="Select a prototype" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-popover border-border">
+                        {prototypes.map((prototype) => (
+                          <SelectItem
+                            key={prototype.path}
+                            value={prototype.path}
+                            className="text-popover-foreground hover:bg-hover focus:bg-hover"
+                          >
+                            {prototype.title}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-              <button
-                onClick={handleViewSource}
-                className="w-full px-3 py-2 rounded-md bg-background hover:bg-hover theme-transition border border-border disabled:opacity-50 disabled:cursor-not-allowed text-sm text-foreground flex items-center justify-center gap-2"
-                disabled={!selectedPrototype}
-              >
-                <Code size={16} />
-                View source
-              </button>
-            </div>
+                  <button
+                    onClick={handleViewSource}
+                    className="w-full px-3 py-2 rounded-md bg-background hover:bg-hover theme-transition border border-border disabled:opacity-50 disabled:cursor-not-allowed text-sm text-foreground flex items-center justify-center gap-2"
+                    disabled={!selectedPrototype}
+                  >
+                    <Code size={16} />
+                    View source
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
 
         {/* Flush divider */}
-        {currentConfig && <div className="border-t border-border" />}
+        {!isCollapsed && currentConfig && <div className="border-t border-border" />}
 
         {/* Show configuration controls for the current prototype */}
-        {currentConfig && (
+        {!isCollapsed && currentConfig && (
           <div className="px-4 py-4">
             <ConfigControls
               prototypeId={currentConfig.prototypeId}

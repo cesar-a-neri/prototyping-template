@@ -1,0 +1,25 @@
+id,outputLatency,transcript,annotatorOutput
+12345,60 ms,"Agent: Good morning, how are you feeling today?
+Patient: A little tired, but otherwise okay.
+Agent: Any new symptoms since your last visit?
+Patient: Just some mild dizziness after standing up.",Yes
+12345,60 ms,"Agent: Hi, I'm calling to confirm your follow-up appointment for next Tuesday. Does that still work for you?
+Patient: Yes, that's fine. What time is it again?
+Agent: 10:30 a.m. at the Rochester campus.",Yes
+12345,100 ms,"Agent: I'm checking in after your knee injection last week. How's the pain level now?
+Patient: Much better, maybe a three out of ten.
+Agent: That's great to hear. Any swelling or redness around the joint?...",Yes
+12345,100 ms,"Agent: Just to confirm, you're taking the new dosage of metformin twice a day, correct?
+Patient: Yes, morning and night.
+Agent: Perfect. Any side effects so far?...",Yes
+12345,100 ms,"Agent: Your blood test came back with slightly elevated cholesterol levels.
+Patient: Oh, I see. Is that serious?
+Agent: Nothing alarming, but we'll adjust your diet and recheck in three...",Yes
+12345,45 ms,"Agent: What brings you in today?
+Patient: I've been having some chest tightness when I exercise.
+Agent: How long has that been happening?
+Patient: About a week, maybe a little longer.",Yes
+12345,45 ms,"Agent: Your test results look good. The doctor recommends a follow-up in six months.
+Patient: Okay, should I schedule that now?
+Agent: Yes, let's go ahead and set that up before you leave today....",Yes
+

@@ -1,0 +1,38 @@
+[
+  {
+    "name": "Deep Research Evaluation",
+    "date": "Nov 7, 2025",
+    "dateLabel": "Created",
+    "tags": ["Project name", "Client name"],
+    "csvFile": "deep-research-evaluation.csv"
+  },
+  {
+    "name": "Deep Research Evaluation B",
+    "date": "Nov 7, 2025",
+    "dateLabel": "Created",
+    "tags": ["Project name", "Client name"],
+    "csvFile": "deep-research-evaluation2.csv"
+  },
+  {
+    "name": "Tennis Q/A Eval Task",
+    "date": "Jan 20, 2025",
+    "dateLabel": "Last updated",
+    "tags": ["QA"],
+    "csvFile": "tennis-dataset.csv"
+  },
+  {
+    "name": "Appointment Scheduling",
+    "date": "Jan 20, 2025",
+    "dateLabel": "Last updated",
+    "tags": ["Operations"],
+    "csvFile": "appointment-scheduling.csv"
+  },
+  {
+    "name": "Treatment Plan Review",
+    "date": "Jan 20, 2025",
+    "dateLabel": "Last updated",
+    "tags": ["Clinical"],
+    "csvFile": "treatment-plan-review.csv"
+  }
+]
+
