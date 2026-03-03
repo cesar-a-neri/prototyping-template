@@ -79,7 +79,7 @@ interface InputBoxProps {
     onSend: () => void;
     onStop: () => void;
     isTyping: boolean;
-    textareaRef: React.RefObject<HTMLTextAreaElement>;
+    textareaRef: React.RefObject<HTMLTextAreaElement | null>;
     selectedSource: DataSource | null;
     onSourceChange: (source: DataSource) => void;
     sourceLocked?: boolean;

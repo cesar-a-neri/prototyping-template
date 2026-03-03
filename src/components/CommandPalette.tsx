@@ -81,26 +81,8 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ prototypes }) => {
     }
   };
 
-  const isMac = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform);
-
   return (
     <>
-      {/* Floating hint pill */}
-      <button
-        onClick={() => setOpen(true)}
-        className="fixed bottom-5 right-5 z-50 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg border transition-opacity hover:opacity-100 opacity-60"
-        style={{
-          background: 'rgba(255,255,255,0.9)',
-          backdropFilter: 'blur(8px)',
-          border: '1px solid #e2e8f0',
-          color: '#64748b',
-        }}
-        title="Open prototype switcher"
-      >
-        <Search size={11} />
-        <span>{isMac ? '⌘K' : 'Ctrl+K'}</span>
-      </button>
-
       <Dialog.Root open={open} onOpenChange={setOpen}>
         <Dialog.Portal>
           <Dialog.Overlay
