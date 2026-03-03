@@ -868,7 +868,7 @@ const DuaChat: React.FC = () => {
                                                 </div>
                                             ) : (
                                                 /* Assistant message — left-aligned, no bubble */
-                                                <div className="flex flex-col items-start gap-2">
+                                                <div className="flex flex-col items-start gap-6">
                                                     {msg.executionSteps !== undefined && (
                                                         <ExecutionStepsButton count={msg.executionSteps} />
                                                     )}
