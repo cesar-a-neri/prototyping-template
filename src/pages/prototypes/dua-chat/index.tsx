@@ -10,6 +10,7 @@ import {
     ChevronUp,
     Network,
     Square,
+    XCircle,
 } from 'lucide-react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faUpRightFromSquare } from '@fortawesome/free-solid-svg-icons';
@@ -313,30 +314,116 @@ const ThinkingIndicator: React.FC<{ steps: ExecutionStep[] }> = ({ steps }) => {
 
 // ─── Message Helpers ──────────────────────────────────────────────────────────
 
-const MessageTimestamp: React.FC<{ date: Date }> = ({ date }) => {
-    const datePart = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+const MessageTimestamp: React.FC<{ date: Date; newDay?: boolean }> = ({ date, newDay }) => {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+
+    const isSameDay = (a: Date, b: Date) =>
+        a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+    let datePart: string;
+    if (isSameDay(date, today)) {
+        datePart = 'Today';
+    } else if (isSameDay(date, yesterday)) {
+        datePart = 'Yesterday';
+    } else {
+        datePart = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: isSameDay(new Date(date.getFullYear(), 0, 1), new Date(today.getFullYear(), 0, 1)) ? undefined : 'numeric' });
+    }
+
     const timePart = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
     return (
         <div className="flex items-center justify-center py-2">
             <span className="text-[13px]" style={{ color: '#818ea9' }}>
-                <span className="font-semibold">{datePart}</span>{' '}
-                <span className="font-normal">{timePart}</span>
+                {newDay ? (
+                    <span className="font-semibold">{datePart}</span>
+                ) : (
+                    <>
+                        <span className="font-semibold">{datePart}</span>{' '}
+                        <span className="font-normal">{timePart}</span>
+                    </>
+                )}
             </span>
         </div>
     );
 };
 
+interface SqlResults {
+    columns: string[];
+    rows: (string | number)[][];
+}
+
 interface ExecutionStep {
     label: string;
     status?: 'success' | 'failure';
+    sqlQuery?: string;
+    sqlError?: string;
+    sqlResults?: SqlResults;
 }
+
+const FAILED_SQL = `SELECT
+  product_category,
+  SUM(revenue) AS total_revenue,
+  COUNT(DISTINCT customer_id) AS unique_customers
+FROM sales_data
+WHERE sale_date BETWEEN '2024-01-01' AND '2024-12-31'
+GROUP BY product_category
+ORDER BY total_revenue DESC
+LIMIT 10;`;
+
+const SUCCESS_SQL = `SELECT
+  product_category,
+  SUM(revenue) AS total_revenue,
+  COUNT(DISTINCT customer_id) AS unique_customers
+FROM transactions
+WHERE sale_date BETWEEN '2024-01-01' AND '2024-12-31'
+GROUP BY product_category
+ORDER BY total_revenue DESC
+LIMIT 10;`;
+
+const SUCCESS_RESULTS: SqlResults = {
+    columns: ['product_category', 'total_revenue', 'unique_customers'],
+    rows: [
+        ['Electronics',         4_821_340,  12_450],
+        ['Apparel',             2_934_780,   9_211],
+        ['Home & Garden',       1_750_120,   6_803],
+        ['Sports',              1_412_900,   5_590],
+        ['Books',                 893_200,   8_104],
+        ['Toys & Games',          784_560,   4_932],
+        ['Beauty & Personal',     671_230,   6_218],
+        ['Automotive',            598_410,   2_847],
+        ['Grocery',               541_880,  11_093],
+        ['Office Supplies',       487_320,   3_765],
+        ['Pet Supplies',          423_910,   4_481],
+        ['Musical Instruments',   389_740,   1_922],
+        ['Health & Wellness',     367_650,   5_634],
+        ['Outdoors',              312_490,   2_108],
+        ['Jewelry',               298_760,   3_317],
+        ['Baby Products',         276_140,   4_056],
+        ['Video Games',           251_830,   3_789],
+        ['Kitchen & Dining',      234_620,   4_213],
+        ['Luggage',               198_350,   1_644],
+        ['Industrial',            174_090,   1_128],
+    ],
+};
 
 const ALL_EXECUTION_STEPS: ExecutionStep[] = [
     { label: 'Analyzing Natural Language Request' },
     { label: 'Mapping Request to Database Schema' },
     { label: 'Translating to SQL Query' },
-    { label: 'Executing SQL Query', status: 'failure' },
-    { label: 'Executing SQL Query', status: 'success' },
+    {
+        label: 'Executing SQL Query',
+        status: 'failure',
+        sqlQuery: FAILED_SQL,
+        sqlError: 'failed to execute sql: uploading table: sql upload table failed after 1 attempts: creating record reader: creating record reader: dataset scope validation failed: googleapi: Error 400: Unrecognized name: sales_data at [5:6], invalidQuery',
+    },
+    {
+        label: 'Executing SQL Query',
+        status: 'success',
+        sqlQuery: SUCCESS_SQL,
+        sqlResults: SUCCESS_RESULTS,
+    },
     { label: 'Fetching Data from Warehouses' },
     { label: 'Analyzing Data for Turning Points' },
     { label: 'Synthesizing Final Natural Language Answer' },
@@ -374,10 +461,309 @@ const AccentBadge: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     </span>
 );
 
+// ─── SQL Syntax Highlighting ─────────────────────────────────────────────────
+
+const SQL_KEYWORDS = new Set([
+    'WITH', 'SELECT', 'FROM', 'WHERE', 'AND', 'OR', 'ON', 'JOIN', 'LEFT', 'RIGHT',
+    'INNER', 'OUTER', 'FULL', 'CROSS', 'GROUP', 'BY', 'ORDER', 'HAVING', 'LIMIT',
+    'OFFSET', 'UNION', 'ALL', 'DISTINCT', 'AS', 'OVER', 'PARTITION', 'BETWEEN',
+    'IN', 'NOT', 'NULL', 'IS', 'LIKE', 'EXISTS', 'CASE', 'WHEN', 'THEN', 'ELSE',
+    'END', 'INSERT', 'INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE', 'CREATE',
+    'DROP', 'ALTER', 'TABLE', 'INDEX', 'VIEW', 'TOP', 'ASC', 'DESC', 'FETCH',
+    'NEXT', 'ROWS', 'ONLY', 'BEGIN', 'COMMIT', 'ROLLBACK',
+]);
+
+const SQL_FUNCTIONS = new Set([
+    'LAG', 'LEAD', 'ROW_NUMBER', 'RANK', 'DENSE_RANK', 'NTILE', 'FIRST_VALUE',
+    'LAST_VALUE', 'NTH_VALUE', 'CUME_DIST', 'PERCENT_RANK', 'COUNT', 'SUM',
+    'AVG', 'MIN', 'MAX', 'COALESCE', 'ISNULL', 'IFNULL', 'NULLIF', 'CAST',
+    'CONVERT', 'DATE', 'YEAR', 'MONTH', 'DAY', 'DATEADD', 'DATEDIFF', 'GETDATE',
+    'NOW', 'UPPER', 'LOWER', 'TRIM', 'LTRIM', 'RTRIM', 'SUBSTRING', 'REPLACE',
+    'LEN', 'LENGTH', 'CONCAT', 'IIF', 'ROUND', 'FLOOR', 'CEILING', 'ABS',
+    'SQRT', 'POWER', 'STRING_AGG', 'LISTAGG', 'NVL', 'DECODE', 'EXTRACT',
+    'CURRENT_DATE', 'CURRENT_TIMESTAMP', 'SYSDATE',
+]);
+
+type SqlTokenType = 'keyword' | 'function' | 'string' | 'number' | 'comment' | 'default';
+type SqlToken = { type: SqlTokenType; value: string };
+
+function tokenizeSql(sql: string): SqlToken[] {
+    const tokens: SqlToken[] = [];
+    let i = 0;
+    while (i < sql.length) {
+        // Single-line comment
+        if (sql[i] === '-' && sql[i + 1] === '-') {
+            const end = sql.indexOf('\n', i);
+            const val = end === -1 ? sql.slice(i) : sql.slice(i, end);
+            tokens.push({ type: 'comment', value: val });
+            i += val.length;
+            continue;
+        }
+        // Multi-line comment
+        if (sql[i] === '/' && sql[i + 1] === '*') {
+            const end = sql.indexOf('*/', i + 2);
+            const val = end === -1 ? sql.slice(i) : sql.slice(i, end + 2);
+            tokens.push({ type: 'comment', value: val });
+            i += val.length;
+            continue;
+        }
+        // String literal (single-quoted)
+        if (sql[i] === "'") {
+            let j = i + 1;
+            while (j < sql.length) {
+                if (sql[j] === "'" && sql[j - 1] !== '\\') { j++; break; }
+                j++;
+            }
+            tokens.push({ type: 'string', value: sql.slice(i, j) });
+            i = j;
+            continue;
+        }
+        // Number
+        if (/\d/.test(sql[i]) && (i === 0 || /\W/.test(sql[i - 1]))) {
+            let j = i;
+            while (j < sql.length && /[\d.]/.test(sql[j])) j++;
+            tokens.push({ type: 'number', value: sql.slice(i, j) });
+            i = j;
+            continue;
+        }
+        // Identifier / keyword / function
+        if (/[A-Za-z_]/.test(sql[i])) {
+            let j = i;
+            while (j < sql.length && /[\w]/.test(sql[j])) j++;
+            const word = sql.slice(i, j);
+            const upper = word.toUpperCase();
+            if (SQL_KEYWORDS.has(upper)) {
+                tokens.push({ type: 'keyword', value: word });
+            } else if (SQL_FUNCTIONS.has(upper)) {
+                tokens.push({ type: 'function', value: word });
+            } else {
+                tokens.push({ type: 'default', value: word });
+            }
+            i = j;
+            continue;
+        }
+        tokens.push({ type: 'default', value: sql[i] });
+        i++;
+    }
+    return tokens;
+}
+
+const TOKEN_COLORS: Partial<Record<SqlTokenType, string>> = {
+    keyword: '#714dff',
+    function: '#00badc',
+    string: '#34a853',
+    number: '#e6823a',
+    comment: '#94a3b8',
+};
+
+const SqlSyntaxHighlight: React.FC<{ sql: string }> = ({ sql }) => {
+    const tokens = tokenizeSql(sql);
+    return (
+        <>
+            {tokens.map((token, i) => {
+                const color = TOKEN_COLORS[token.type];
+                if (color) return <span key={i} style={{ color }}>{token.value}</span>;
+                return <React.Fragment key={i}>{token.value}</React.Fragment>;
+            })}
+        </>
+    );
+};
+
+const SqlCodeBlock: React.FC<{ sql: string }> = ({ sql }) => {
+    const [expanded, setExpanded] = useState(false);
+
+    return (
+        <div className="rounded-lg overflow-hidden" style={{ border: '1px solid rgba(0,50,145,0.18)' }}>
+            <div className="relative bg-white">
+                <div
+                    className="px-4 py-3 overflow-x-auto"
+                    style={{ maxHeight: expanded ? 'none' : '200px', overflow: expanded ? 'auto' : 'hidden' }}
+                >
+                    <pre
+                        className="m-0 whitespace-pre font-mono"
+                        style={{ fontSize: '13px', lineHeight: '20px', color: '#19202f' }}
+                    >
+                        <code><SqlSyntaxHighlight sql={sql} /></code>
+                    </pre>
+                </div>
+                {!expanded && (
+                    <div
+                        className="absolute bottom-0 left-0 right-0 h-14 pointer-events-none"
+                        style={{ background: 'linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,1) 100%)' }}
+                    />
+                )}
+            </div>
+            <div
+                className="flex items-center justify-end px-4 py-2"
+                style={{ borderTop: '1px solid rgba(0,50,145,0.10)', background: '#ffffff' }}
+            >
+                <button
+                    onClick={() => setExpanded(v => !v)}
+                    className="flex items-center gap-1 transition-opacity hover:opacity-70"
+                    style={{ fontSize: '12px', fontWeight: 500, color: '#78839c' }}
+                >
+                    {expanded ? 'Show less' : 'Show more'}
+                    {expanded
+                        ? <ChevronUp className="w-3 h-3" />
+                        : <ChevronDown className="w-3 h-3" />
+                    }
+                </button>
+            </div>
+        </div>
+    );
+};
+
+// ─── SQL Step Detail Panel ────────────────────────────────────────────────────
+
+const SqlStepDetail: React.FC<{ step: ExecutionStep }> = ({ step }) => {
+    const [tab, setTab] = useState<'query' | 'results'>('query');
+    const isFailed = step.status === 'failure';
+
+    const sqlText = step.sqlQuery ?? '';
+
+    const copyToClipboard = () => navigator.clipboard.writeText(sqlText).catch(() => {});
+    const downloadSql = () => {
+        const blob = new Blob([sqlText], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'query.sql'; a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    return (
+        <div className="flex flex-col gap-0 px-4 pb-4">
+            {/* Toolbar: segmented control + action icons */}
+            <div className="flex items-center justify-between mb-3" style={{ marginTop: 2 }}>
+                {/* Segmented control */}
+                <div
+                    className="flex items-center p-[2px] rounded-md text-[12px]"
+                    style={{ border: '1px solid #d1daeb', background: '#f5f7fa' }}
+                >
+                    {(['query', 'results'] as const).map(t => (
+                        <button
+                            key={t}
+                            onClick={() => setTab(t)}
+                            className="px-3 h-[22px] rounded transition-all"
+                            style={tab === t ? {
+                                background: '#ede9fd',
+                                color: '#5746d4',
+                                fontWeight: 600,
+                            } : {
+                                background: 'transparent',
+                                color: '#78839c',
+                                fontWeight: 400,
+                            }}
+                        >
+                            {t.charAt(0).toUpperCase() + t.slice(1)}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Action icon buttons */}
+                <div className="flex items-center gap-1">
+                    <button
+                        onClick={copyToClipboard}
+                        className="flex items-center justify-center w-6 h-6 rounded transition-colors hover:bg-gray-3"
+                        title="Copy SQL"
+                    >
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M9.75 7.875C9.96094 7.875 10.125 7.71094 10.125 7.5V2.88281C10.125 2.76562 10.0781 2.67188 10.0078 2.60156L8.64844 1.24219C8.57812 1.17188 8.48438 1.125 8.39062 1.125H5.25C5.03906 1.125 4.875 1.28906 4.875 1.5V7.5C4.875 7.71094 5.03906 7.875 5.25 7.875H9.75ZM5.25 9C4.42969 9 3.75 8.32031 3.75 7.5V1.5C3.75 0.679688 4.42969 0 5.25 0H8.39062C8.78906 0 9.16406 0.164062 9.44531 0.445312L10.8047 1.80469C11.0859 2.08594 11.25 2.48438 11.25 2.88281V7.5C11.25 8.32031 10.5703 9 9.75 9H5.25ZM2.25 3H2.625V4.125H2.25C2.03906 4.125 1.875 4.28906 1.875 4.5V10.5C1.875 10.7109 2.03906 10.875 2.25 10.875H6.75C6.96094 10.875 7.125 10.7109 7.125 10.5V10.125H8.25V10.5C8.25 11.3203 7.57031 12 6.75 12H2.25C1.42969 12 0.75 11.3203 0.75 10.5V4.5C0.75 3.67969 1.42969 3 2.25 3Z" fill="#818EA9"/>
+                        </svg>
+                    </button>
+                    <button
+                        onClick={downloadSql}
+                        className="flex items-center justify-center w-6 h-6 rounded transition-colors hover:bg-gray-3"
+                        title="Download SQL"
+                    >
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M6.5625 0.5625V6.32812L8.03906 4.85156C8.25 4.64062 8.625 4.64062 8.83594 4.85156C9.04688 5.0625 9.04688 5.4375 8.83594 5.64844L6.39844 8.08594C6.1875 8.29688 5.8125 8.29688 5.60156 8.08594L3.16406 5.64844C2.95312 5.4375 2.95312 5.08594 3.16406 4.85156C3.375 4.64062 3.75 4.64062 3.96094 4.85156L5.4375 6.32812V0.5625C5.4375 0.257812 5.69531 0 6 0C6.30469 0 6.5625 0.257812 6.5625 0.5625ZM2.29688 6.375L3.42188 7.5H2.25C2.03906 7.5 1.875 7.66406 1.875 7.875V9.75C1.875 9.96094 2.03906 10.125 2.25 10.125H9.75C9.96094 10.125 10.125 9.96094 10.125 9.75V7.875C10.125 7.66406 9.96094 7.5 9.75 7.5H8.57812L9.70312 6.375H9.75C10.5703 6.375 11.25 7.05469 11.25 7.875V9.75C11.25 10.5703 10.5703 11.25 9.75 11.25H2.25C1.42969 11.25 0.75 10.5703 0.75 9.75V7.875C0.75 7.05469 1.42969 6.375 2.25 6.375H2.29688ZM9.375 8.8125C9.375 9.11719 9.11719 9.375 8.8125 9.375C8.50781 9.375 8.25 9.11719 8.25 8.8125C8.25 8.50781 8.50781 8.25 8.8125 8.25C9.11719 8.25 9.375 8.50781 9.375 8.8125Z" fill="#818EA9"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            {/* Query tab: code block */}
+            {tab === 'query' && (
+                <SqlCodeBlock sql={step.sqlQuery ?? ''} />
+            )}
+
+            {/* Results tab */}
+            {tab === 'results' && isFailed && step.sqlError && (
+                <div
+                    className="rounded-[6px] flex flex-col px-3 py-2"
+                    style={{ background: 'rgba(230,18,13,0.04)', gap: 4 }}
+                >
+                    <div className="flex items-center gap-2">
+                        <XCircle className="w-[14px] h-[14px] flex-shrink-0" style={{ color: '#E6120D' }} />
+                        <span className="text-[14px] font-semibold leading-5" style={{ color: '#E6120D' }}>
+                            Execution Error
+                        </span>
+                    </div>
+                    <p className="text-[14px] leading-[1.6] m-0" style={{ color: '#19202f' }}>
+                        {step.sqlError}
+                    </p>
+                </div>
+            )}
+
+            {tab === 'results' && !isFailed && step.sqlResults && (
+                <div className="flex flex-col gap-2">
+                    <span className="text-[12px]" style={{ color: '#78839c' }}>
+                        Previewing 20 of 180 rows
+                    </span>
+                    <div className="rounded-lg overflow-hidden" style={{ border: '1px solid #d1daeb', maxHeight: 240, overflowY: 'auto' }}>
+                        <table className="w-full text-[12px] border-collapse">
+                            <thead>
+                                <tr style={{ background: '#f5f7fa' }}>
+                                    {step.sqlResults.columns.map(col => (
+                                        <th
+                                            key={col}
+                                            className="px-3 py-2 text-left font-medium whitespace-nowrap sticky top-0"
+                                            style={{ color: '#78839c', borderBottom: '1px solid #d1daeb', background: '#f5f7fa' }}
+                                        >
+                                            {col}
+                                        </th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {step.sqlResults.rows.map((row, ri) => (
+                                    <tr
+                                        key={ri}
+                                        style={{ borderBottom: ri < step.sqlResults!.rows.length - 1 ? '1px solid #d1daeb' : 'none' }}
+                                    >
+                                        {row.map((cell, ci) => (
+                                            <td
+                                                key={ci}
+                                                className="px-3 py-2 whitespace-nowrap"
+                                                style={{ color: '#19202f' }}
+                                            >
+                                                {typeof cell === 'number' ? cell.toLocaleString() : cell}
+                                            </td>
+                                        ))}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// ─── Execution Steps Button ───────────────────────────────────────────────────
+
 const ExecutionStepsButton: React.FC<{ count: number }> = ({ count }) => {
     const [open, setOpen] = useState(false);
+    const [expandedSteps, setExpandedSteps] = useState<Record<number, boolean>>({});
     const steps = ALL_EXECUTION_STEPS.slice(0, Math.min(count, ALL_EXECUTION_STEPS.length));
     const queryCount = steps.filter(s => s.label === 'Executing SQL Query').length || 1;
+
+    const toggleStep = (i: number) => {
+        setExpandedSteps(prev => ({ ...prev, [i]: !prev[i] }));
+    };
+
+    const isSqlStep = (step: ExecutionStep) => step.label === 'Executing SQL Query' && step.sqlQuery;
 
     return (
         <div className="flex flex-col gap-2 w-full">
@@ -388,7 +774,6 @@ const ExecutionStepsButton: React.FC<{ count: number }> = ({ count }) => {
             >
                 {/* Left: icon badges + summary text */}
                 <div className="flex items-center gap-2 min-w-0">
-                    {/* Overlapping icon+badge pair */}
                     <div className="flex items-center flex-shrink-0" style={{ gap: '-4px' }}>
                         <div className="relative flex items-center justify-center w-6 h-6 mr-1">
                             <Network className="w-[14px] h-[14px]" style={{ color: '#5b6579' }} />
@@ -404,11 +789,8 @@ const ExecutionStepsButton: React.FC<{ count: number }> = ({ count }) => {
                     </span>
                 </div>
 
-                {/* Right: label + chevron */}
-                <div className="flex items-center gap-1.5 flex-shrink-0 ml-4">
-                    <span className="text-[14px] font-semibold whitespace-nowrap" style={{ color: '#5b6579', letterSpacing: '-0.16px' }}>
-                        {open ? 'Hide Steps' : 'Show Steps'}
-                    </span>
+                {/* Right: chevron */}
+                <div className="flex items-center flex-shrink-0 ml-4">
                     {open
                         ? <ChevronUp className="w-4 h-4" style={{ color: '#5b6579' }} />
                         : <ChevronDown className="w-4 h-4" style={{ color: '#5b6579' }} />
@@ -419,33 +801,49 @@ const ExecutionStepsButton: React.FC<{ count: number }> = ({ count }) => {
             {/* Expanded panel */}
             {open && (
                 <div className="w-full rounded-lg overflow-hidden" style={{ border: '1px solid #d1daeb' }}>
-                    {steps.map((step, i) => (
-                        <div
-                            key={i}
-                            className="flex items-center gap-[11px] px-4 py-2"
-                            style={{ borderBottom: i < steps.length - 1 ? '1px solid #d1daeb' : 'none', minHeight: '42px' }}
-                        >
-                            <NeutralBadge>{i + 1}</NeutralBadge>
-                            <span className="flex-1 text-[14px] font-normal leading-5 min-w-0 flex items-center gap-2" style={{ color: '#19202f' }}>
-                                {step.label}
-                                {step.status === 'failure' && (
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12" fill="none" className="flex-shrink-0">
-                                        <circle cx="6" cy="6" r="3" fill="#F24C00"/>
-                                        <circle cx="6" cy="6" r="4.5" stroke="#F24C00" strokeOpacity="0.2" strokeWidth="3"/>
-                                    </svg>
-                                )}
-                                {step.status === 'success' && (
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12" fill="none" className="flex-shrink-0">
-                                        <circle cx="6" cy="6" r="3" fill="#3E9B4F"/>
-                                        <circle cx="6" cy="6" r="4.5" stroke="#3E9B4F" strokeOpacity="0.2" strokeWidth="3"/>
-                                    </svg>
-                                )}
-                            </span>
-                            <div className="flex items-center justify-center w-[18px] h-[18px] flex-shrink-0">
-                                <ChevronUp className="w-3.5 h-3.5" style={{ color: '#818ea9' }} />
+                    {steps.map((step, i) => {
+                        const expandable = isSqlStep(step);
+                        const expanded = expandable && !!expandedSteps[i];
+                        return (
+                            <div
+                                key={i}
+                                style={{ borderBottom: i < steps.length - 1 ? '1px solid #d1daeb' : 'none' }}
+                            >
+                                {/* Step row */}
+                                <div
+                                    className={`flex items-center gap-[11px] px-4 py-2 ${expandable ? 'cursor-pointer hover:bg-gray-1 transition-colors' : ''}`}
+                                    style={{ minHeight: '42px' }}
+                                    onClick={expandable ? () => toggleStep(i) : undefined}
+                                >
+                                    <NeutralBadge>{i + 1}</NeutralBadge>
+                                    <span className="flex-1 text-[14px] font-normal leading-5 min-w-0 flex items-center gap-2" style={{ color: '#19202f' }}>
+                                        {step.label}
+                                        {step.status === 'failure' && (
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12" fill="none" className="flex-shrink-0">
+                                                <circle cx="6" cy="6" r="3" fill="#F24C00"/>
+                                                <circle cx="6" cy="6" r="4.5" stroke="#F24C00" strokeOpacity="0.2" strokeWidth="3"/>
+                                            </svg>
+                                        )}
+                                        {step.status === 'success' && (
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12" fill="none" className="flex-shrink-0">
+                                                <circle cx="6" cy="6" r="3" fill="#3E9B4F"/>
+                                                <circle cx="6" cy="6" r="4.5" stroke="#3E9B4F" strokeOpacity="0.2" strokeWidth="3"/>
+                                            </svg>
+                                        )}
+                                    </span>
+                                    <div className="flex items-center justify-center w-[18px] h-[18px] flex-shrink-0">
+                                        {expanded
+                                            ? <ChevronUp className="w-3.5 h-3.5" style={{ color: '#818ea9' }} />
+                                            : <ChevronDown className="w-3.5 h-3.5" style={{ color: '#818ea9' }} />
+                                        }
+                                    </div>
+                                </div>
+
+                                {/* SQL detail panel */}
+                                {expanded && <SqlStepDetail step={step} />}
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
         </div>
@@ -842,12 +1240,39 @@ const DuaChat: React.FC = () => {
                         <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
                             <div className="max-w-[640px] mx-auto px-8 py-6 flex flex-col gap-6">
                                 {activeThread!.messages.map((msg, idx) => {
-                                    const prevMsg = idx > 0 ? activeThread!.messages[idx - 1] : null;
-                                    const showTimestamp = msg.timestamp && (!prevMsg || !prevMsg.timestamp);
+                                    const isSameCalendarDay = (a: Date, b: Date) =>
+                                        a.getFullYear() === b.getFullYear() &&
+                                        a.getMonth() === b.getMonth() &&
+                                        a.getDate() === b.getDate();
+
+                                    // Find the most recent preceding message that carries a timestamp
+                                    const prevTimestampedMsg = activeThread!.messages
+                                        .slice(0, idx)
+                                        .reverse()
+                                        .find(m => !!m.timestamp) ?? null;
+
+                                    let showTimestamp = false;
+                                    let newDay = false;
+
+                                    if (msg.timestamp) {
+                                        if (!prevTimestampedMsg) {
+                                            showTimestamp = true;
+                                        } else {
+                                            const diffSeconds = (msg.timestamp.getTime() - prevTimestampedMsg.timestamp!.getTime()) / 1000;
+                                            const differentDay = !isSameCalendarDay(msg.timestamp, prevTimestampedMsg.timestamp!);
+                                            if (differentDay) {
+                                                showTimestamp = true;
+                                                newDay = true;
+                                            } else if (diffSeconds > 1200) {
+                                                showTimestamp = true;
+                                            }
+                                        }
+                                    }
+
                                     return (
                                         <React.Fragment key={msg.id}>
                                             {showTimestamp && msg.timestamp && (
-                                                <MessageTimestamp date={msg.timestamp} />
+                                                <MessageTimestamp date={msg.timestamp} newDay={newDay} />
                                             )}
                                             {msg.role === 'user' ? (
                                                 /* User message — right-aligned */
