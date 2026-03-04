@@ -1,38 +1,52 @@
 [
   {
+    "id": "16d96d73",
     "name": "Deep Research Evaluation",
     "date": "Nov 7, 2025",
     "dateLabel": "Created",
     "tags": ["Project name", "Client name"],
-    "csvFile": "deep-research-evaluation.csv"
+    "csvFile": "deep-research-evaluation.csv",
+    "datasetId": "ds_deep_research_01",
+    "datasetName": "Deep Research Dataset"
   },
   {
+    "id": "a3f8e21b",
     "name": "Deep Research Evaluation B",
     "date": "Nov 7, 2025",
     "dateLabel": "Created",
     "tags": ["Project name", "Client name"],
-    "csvFile": "deep-research-evaluation2.csv"
+    "csvFile": "deep-research-evaluation2.csv",
+    "datasetId": "ds_deep_research_01",
+    "datasetName": "Deep Research Dataset"
   },
   {
+    "id": "7c4b9e05",
     "name": "Tennis Q/A Eval Task",
     "date": "Jan 20, 2025",
     "dateLabel": "Last updated",
     "tags": ["QA"],
-    "csvFile": "tennis-dataset.csv"
+    "csvFile": "tennis-dataset.csv",
+    "datasetId": "ds_tennis_qa_01",
+    "datasetName": "Tennis Q/A Dataset"
   },
   {
+    "id": "e2d04f8a",
     "name": "Appointment Scheduling",
     "date": "Jan 20, 2025",
     "dateLabel": "Last updated",
     "tags": ["Operations"],
-    "csvFile": "appointment-scheduling.csv"
+    "csvFile": "appointment-scheduling.csv",
+    "datasetId": "ds_appointments_01",
+    "datasetName": "Appointment Scheduling Dataset"
   },
   {
+    "id": "5b1a7c3e",
     "name": "Treatment Plan Review",
     "date": "Jan 20, 2025",
     "dateLabel": "Last updated",
     "tags": ["Clinical"],
-    "csvFile": "treatment-plan-review.csv"
+    "csvFile": "treatment-plan-review.csv",
+    "datasetId": "ds_treatment_01",
+    "datasetName": "Treatment Plans Dataset"
   }
 ]
-

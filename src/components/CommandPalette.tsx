@@ -1,15 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ComponentType } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Search, ArrowRight } from 'lucide-react';
-
-type PrototypeRoute = {
-  path: string;
-  title: string;
-  module: () => Promise<{ default: ComponentType }>;
-  sourceFiles: Array<{ path: string; content: string }>;
-};
+import { PrototypeRoute } from '@/types';
 
 interface CommandPaletteProps {
   prototypes: PrototypeRoute[];

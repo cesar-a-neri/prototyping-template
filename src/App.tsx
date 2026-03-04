@@ -5,13 +5,7 @@ import { ThemeProvider } from './lib/theme';
 import { ConfigProvider } from './lib/config';
 import { TooltipProvider } from './components/ui/tooltip';
 import { getPrototypeRoutes } from './utils/prototypes';
-
-type PrototypeRoute = {
-  path: string;
-  title: string;
-  module: () => Promise<{ default: React.ComponentType }>;
-  sourceFiles: Array<{ path: string; content: string }>;
-};
+import { PrototypeRoute } from './types';
 
 const App: React.FC = () => {
   const [routes, setRoutes] = useState<PrototypeRoute[]>([]);

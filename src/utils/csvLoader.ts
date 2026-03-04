@@ -1,11 +1,14 @@
 // Utility functions for loading and parsing CSV files
 
 export interface EvaluationMetadata {
+  id: string;
   name: string;
   date: string;
   dateLabel: string;
   tags: string[];
   csvFile: string;
+  datasetId: string;
+  datasetName: string;
 }
 
 export interface EvaluationData {
