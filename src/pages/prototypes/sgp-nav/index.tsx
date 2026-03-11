@@ -3,7 +3,7 @@ import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Brain, Cpu, Plug,
-  File, Wrench, Activity,
+  File, Wrench,
   LayoutDashboard, ChartGantt,
   ChevronDown, LayoutGrid, Search,
 } from 'lucide-react';
