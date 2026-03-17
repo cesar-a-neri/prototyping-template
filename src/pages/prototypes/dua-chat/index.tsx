@@ -11,6 +11,7 @@ import {
     Network,
     Square,
     XCircle,
+    SlidersHorizontal,
 } from 'lucide-react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faUpRightFromSquare } from '@fortawesome/free-solid-svg-icons';
@@ -71,7 +72,46 @@ const DATA_SOURCES = [
     { id: 'imf', label: 'IMF Economic Data' },
 ];
 
+const DATABASES: Record<string, { id: string; label: string }[]> = {
+    wb: [
+        { id: 'wb-econ', label: 'Economic Indicators' },
+        { id: 'wb-social', label: 'Social Development' },
+        { id: 'wb-finance', label: 'Financial Markets' },
+    ],
+    qns: [
+        { id: 'qns-pop', label: 'Population & Housing' },
+        { id: 'qns-econ', label: 'Economic Activity' },
+        { id: 'qns-infra', label: 'Infrastructure' },
+    ],
+    imf: [
+        { id: 'imf-weo', label: 'World Economic Outlook' },
+        { id: 'imf-gfsr', label: 'Financial Stability' },
+        { id: 'imf-bop', label: 'Balance of Payments' },
+    ],
+};
+
+const SCHEMAS: Record<string, { id: string; label: string }[]> = {
+    'wb-econ':    [{ id: 'wb-econ-pub', label: 'public' }, { id: 'wb-econ-raw', label: 'raw' }, { id: 'wb-econ-agg', label: 'aggregated' }],
+    'wb-social':  [{ id: 'wb-social-pub', label: 'public' }, { id: 'wb-social-meta', label: 'metadata' }],
+    'wb-finance': [{ id: 'wb-finance-pub', label: 'public' }, { id: 'wb-finance-hist', label: 'historical' }],
+    'qns-pop':    [{ id: 'qns-pop-pub', label: 'public' }, { id: 'qns-pop-census', label: 'census' }],
+    'qns-econ':   [{ id: 'qns-econ-pub', label: 'public' }, { id: 'qns-econ-gdp', label: 'gdp' }],
+    'qns-infra':  [{ id: 'qns-infra-pub', label: 'public' }, { id: 'qns-infra-transport', label: 'transport' }],
+    'imf-weo':    [{ id: 'imf-weo-pub', label: 'public' }, { id: 'imf-weo-proj', label: 'projections' }],
+    'imf-gfsr':   [{ id: 'imf-gfsr-pub', label: 'public' }, { id: 'imf-gfsr-risk', label: 'risk_data' }],
+    'imf-bop':    [{ id: 'imf-bop-pub', label: 'public' }, { id: 'imf-bop-current', label: 'current_account' }],
+};
+
+const MODELS = [
+    { id: 'claude-opus-4',    label: 'Claude Opus 4' },
+    { id: 'claude-sonnet-4',  label: 'Claude Sonnet 4' },
+    { id: 'claude-haiku-4',   label: 'Claude Haiku 4' },
+] as const;
+
 type DataSource = typeof DATA_SOURCES[number];
+type DatabaseOption = { id: string; label: string };
+type SchemaOption = { id: string; label: string };
+type ModelOption = typeof MODELS[number];
 
 interface InputBoxProps {
     input: string;
@@ -83,7 +123,14 @@ interface InputBoxProps {
     textareaRef: React.RefObject<HTMLTextAreaElement | null>;
     selectedSource: DataSource | null;
     onSourceChange: (source: DataSource) => void;
-    sourceLocked?: boolean;
+    selectedDatabase: DatabaseOption | null;
+    onDatabaseChange: (db: DatabaseOption | null) => void;
+    selectedSchema: SchemaOption | null;
+    onSchemaChange: (schema: SchemaOption | null) => void;
+    selectedModel: ModelOption;
+    onModelChange: (model: ModelOption) => void;
+    contextLocked?: boolean;
+    onNewThread?: () => void;
     requiredBump?: number;
     placeholder?: string;
     compact?: boolean;
@@ -99,43 +146,138 @@ const InputBox: React.FC<InputBoxProps> = ({
     textareaRef,
     selectedSource,
     onSourceChange,
-    sourceLocked = false,
+    selectedDatabase,
+    onDatabaseChange,
+    selectedSchema,
+    onSchemaChange,
+    selectedModel,
+    onModelChange,
+    contextLocked = false,
+    onNewThread,
     requiredBump = 0,
     placeholder = '',
     compact = false,
 }) => {
+    // Only data source is required to send; database and schema are optional
     const canSend = input.trim().length > 0 && !isTyping && selectedSource !== null;
-    const [dropdownOpen, setDropdownOpen] = useState(false);
-    const [requiredVisible, setRequiredVisible] = useState(false);
+    type InnerDropdown = 'source' | 'database' | 'schema' | 'model';
+    const [optionsOpen, setOptionsOpen] = useState(false);
+    const [openInner, setOpenInner] = useState<InnerDropdown | null>(null);
+    const [showRequired, setShowRequired] = useState(false);
     const requiredTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const toolbarRef = useRef<HTMLDivElement>(null);
+
+    const popoverAbove = true;
 
     useEffect(() => {
         if (!requiredBump) return;
+        setOptionsOpen(true);
+        setShowRequired(true);
         if (requiredTimerRef.current) clearTimeout(requiredTimerRef.current);
-        setRequiredVisible(true);
-        requiredTimerRef.current = setTimeout(() => setRequiredVisible(false), 3000);
+        requiredTimerRef.current = setTimeout(() => setShowRequired(false), 3000);
         return () => { if (requiredTimerRef.current) clearTimeout(requiredTimerRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [requiredBump]);
-    const dropdownRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if (!dropdownOpen) return;
+        if (optionsOpen) return;
+        setOpenInner(null);
+    }, [optionsOpen]);
+
+    useEffect(() => {
+        if (!optionsOpen) return;
         const handler = (e: MouseEvent) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-                setDropdownOpen(false);
+            if (toolbarRef.current && !toolbarRef.current.contains(e.target as Node)) {
+                setOptionsOpen(false);
             }
         };
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
-    }, [dropdownOpen]);
+    }, [optionsOpen]);
+
+    const availableDatabases = selectedSource ? (DATABASES[selectedSource.id] ?? []) : [];
+    const availableSchemas = selectedDatabase ? (SCHEMAS[selectedDatabase.id] ?? []) : [];
+    // Dot appears when either optional field is configured
+    const showDot = !!(selectedDatabase || selectedSchema);
+
+    const toggleInner = (key: InnerDropdown) => setOpenInner(v => v === key ? null : key);
+
+    // Inline selector row used inside the popover
+    const InlineSelector = ({ label, value, placeholder, locked, innerKey, items, onSelect, onClear, isRequired }: {
+        label: string;
+        value: string | null;
+        placeholder: string;
+        locked: boolean;
+        innerKey: InnerDropdown;
+        items: { id: string; label: string }[];
+        onSelect: (item: { id: string; label: string }) => void;
+        onClear?: () => void;
+        isRequired?: boolean;
+    }) => (
+        <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between">
+                <span className="text-[11px] font-medium uppercase tracking-wide" style={{ color: '#818ea9' }}>{label}</span>
+                {isRequired && showRequired && !value && (
+                    <span className="text-[11px] font-medium" style={{ color: '#e5484d' }}>Required</span>
+                )}
+            </div>
+            <div className="relative">
+                <button
+                    onClick={() => !locked && toggleInner(innerKey)}
+                    className={cn(
+                        'flex items-center gap-1.5 w-full h-7 px-2.5 rounded-md transition-colors text-left',
+                        !locked && 'hover:bg-gray-2',
+                        locked && 'cursor-default',
+                    )}
+                    style={{ border: '1px solid #e9e9eb', backgroundColor: '#fafafa' }}
+                >
+                    <span className="text-[13px] flex-1 truncate" style={{ color: value ? '#19202f' : '#818ea9' }}>
+                        {value ?? placeholder}
+                    </span>
+                    {/* Clear button — only for optional fields with a value */}
+                    {!locked && onClear && value && (
+                        <span
+                            role="button"
+                            onClick={e => { e.stopPropagation(); onClear(); }}
+                            className="flex items-center justify-center w-3.5 h-3.5 rounded-full flex-shrink-0 hover:bg-gray-4 transition-colors"
+                            style={{ color: '#818ea9' }}
+                        >
+                            <XCircle className="w-3 h-3" />
+                        </span>
+                    )}
+                    {!locked && !onClear && <ChevronDown className="w-3 h-3 flex-shrink-0" style={{ color: '#818ea9' }} />}
+                    {!locked && onClear && !value && <ChevronDown className="w-3 h-3 flex-shrink-0" style={{ color: '#818ea9' }} />}
+                </button>
+                {openInner === innerKey && items.length > 0 && (
+                    <div
+                        className={cn(
+                            'absolute left-0 z-[60] py-1 rounded-lg w-full overflow-hidden',
+                            popoverAbove ? 'bottom-full mb-1' : 'top-full mt-1',
+                        )}
+                        style={{ backgroundColor: '#ffffff', border: '1px solid #e9e9eb', boxShadow: '0px 4px 16px rgba(0,0,0,0.12)' }}
+                    >
+                        {items.map(item => (
+                            <button
+                                key={item.id}
+                                onClick={() => { onSelect(item); setOpenInner(null); setShowRequired(false); }}
+                                className="flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-gray-2 transition-colors"
+                            >
+                                <span className="text-[13px] font-normal flex-1" style={{ color: item.label === value ? '#19202f' : '#45464f' }}>
+                                    {item.label}
+                                </span>
+                                {item.label === value && <span className="text-[11px]" style={{ color: '#818ea9' }}>✓</span>}
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
 
     return (
         <div
             className="relative bg-white rounded-lg"
-            style={{
-                border: '1px solid #e9e9eb',
-                boxShadow: '0px 3px 15px 0px rgba(0,0,0,0.15)',
-            }}
+            style={{ border: '1px solid #e9e9eb', boxShadow: '0px 3px 15px 0px rgba(0,0,0,0.15)' }}
         >
             {/* Text area */}
             <div className={cn(compact ? 'min-h-[28px] pt-3 pb-2' : 'min-h-[74px] pt-4', 'pl-4 pr-3')}>
@@ -147,99 +289,127 @@ const InputBox: React.FC<InputBoxProps> = ({
                     onKeyDown={onKeyDown}
                     placeholder={placeholder}
                     className="w-full resize-none bg-transparent text-[14px] font-normal leading-5 outline-none placeholder:font-normal"
-                    style={{
-                        color: '#19202f',
-                        caretColor: '#19202f',
-                        maxHeight: '160px',
-                    }}
+                    style={{ color: '#19202f', caretColor: '#19202f', maxHeight: '160px' }}
                 />
             </div>
 
             {/* Toolbar */}
-            <div className="flex items-center justify-between h-12 pl-4 pr-3">
-                {/* Left: + and data source selector */}
+            <div ref={toolbarRef} className="flex items-center justify-between h-12 pl-4 pr-3">
+                {/* Left: + and options button */}
                 <div className="flex items-center gap-1">
+                    {/* Ghost add button */}
                     <button
-                        className="flex items-center justify-center w-6 h-6 rounded hover:bg-gray-2 transition-colors flex-shrink-0"
-                        style={{ border: '1px solid #e9e9eb', color: '#818ea9' }}
+                        className="flex items-center justify-center w-7 h-7 rounded-full hover:bg-gray-2 transition-colors flex-shrink-0"
+                        style={{ color: '#818ea9' }}
                     >
-                        <Plus className="w-3 h-3" />
+                        <Plus className="w-3.5 h-3.5" />
                     </button>
+
                     {!compact && (
-                        <div className="relative" ref={dropdownRef}>
-                            {/* Required tooltip */}
-                            {requiredVisible && (
+                        <div className="relative">
+                            {/* Options popover */}
+                            {optionsOpen && (
                                 <div
-                                    className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-md text-white text-[12px] font-medium whitespace-nowrap pointer-events-none z-50"
-                                    style={{ backgroundColor: '#19202f' }}
-                                >
-                                    Required
-                                    {/* Arrow */}
-                                    <div
-                                        className="absolute top-full left-1/2 -translate-x-1/2"
-                                        style={{
-                                            width: 0, height: 0,
-                                            borderLeft: '5px solid transparent',
-                                            borderRight: '5px solid transparent',
-                                            borderTop: '5px solid #19202f',
-                                        }}
-                                    />
-                                </div>
-                            )}
-                            <button
-                                onClick={() => !sourceLocked && setDropdownOpen(v => !v)}
-                                className={cn(
-                                    'flex items-center gap-1.5 h-6 px-2 rounded transition-colors',
-                                    !sourceLocked && 'hover:bg-gray-2',
-                                    sourceLocked && 'cursor-default',
-                                )}
-                                style={{ border: '1px solid #e9e9eb', minWidth: '180px' }}
-                            >
-                                <Database className="w-3 h-3 flex-shrink-0" style={{ color: '#5b6579' }} />
-                                <span
-                                    className="text-[13px] flex-1 text-left truncate"
-                                    style={{ color: selectedSource ? '#19202f' : '#818ea9' }}
-                                >
-                                    {selectedSource ? selectedSource.label : 'Select Data Source...'}
-                                </span>
-                                {!sourceLocked && (
-                                    <ChevronDown className="w-3 h-3 flex-shrink-0" style={{ color: '#818ea9' }} />
-                                )}
-                            </button>
-                            {dropdownOpen && (
-                                <div
-                                    className="absolute left-0 top-full mt-1 z-50 py-1 rounded-lg overflow-hidden"
+                                    className={cn(
+                                        'absolute left-0 z-50 rounded-xl p-3 flex flex-col gap-3',
+                                        popoverAbove ? 'bottom-full mb-2' : 'top-full mt-2',
+                                    )}
                                     style={{
-                                        minWidth: '180px',
+                                        width: '220px',
                                         backgroundColor: '#ffffff',
                                         border: '1px solid #e9e9eb',
-                                        boxShadow: '0px 4px 16px rgba(0,0,0,0.12)',
+                                        boxShadow: '0px 8px 24px rgba(0,0,0,0.12)',
                                     }}
                                 >
-                                    {DATA_SOURCES.map(source => (
-                                        <button
-                                            key={source.id}
-                                            onClick={() => { onSourceChange(source); setDropdownOpen(false); setRequiredVisible(false); }}
-                                            className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-gray-2 transition-colors"
-                                        >
-                                            <span
-                                                className="text-[13px] font-normal flex-1"
-                                                style={{ color: source.id === selectedSource?.id ? '#19202f' : '#45464f' }}
-                                            >
-                                                {source.label}
-                                            </span>
-                                            {source.id === selectedSource?.id && (
-                                                <span className="text-[11px]" style={{ color: '#818ea9' }}>✓</span>
-                                            )}
-                                        </button>
-                                    ))}
+                                    {/* Model — always at top, always editable */}
+                                    <InlineSelector
+                                        label="Model"
+                                        value={selectedModel.label}
+                                        placeholder="Select model..."
+                                        locked={false}
+                                        innerKey="model"
+                                        items={[...MODELS]}
+                                        onSelect={m => { onModelChange(m as ModelOption); }}
+                                    />
+
+                                    {/* Divider */}
+                                    <div style={{ borderTop: '1px solid #e9e9eb' }} />
+
+                                    {/* Context fields — locked once thread starts */}
+                                    <InlineSelector
+                                        label="Data Source"
+                                        value={selectedSource?.label ?? null}
+                                        placeholder="Select..."
+                                        locked={contextLocked}
+                                        innerKey="source"
+                                        items={DATA_SOURCES}
+                                        onSelect={src => { onSourceChange(src as DataSource); }}
+                                        isRequired
+                                    />
+                                    {selectedSource && (
+                                        <InlineSelector
+                                            label="Database"
+                                            value={selectedDatabase?.label ?? null}
+                                            placeholder="Optional..."
+                                            locked={contextLocked}
+                                            innerKey="database"
+                                            items={availableDatabases}
+                                            onSelect={db => { onDatabaseChange(db); }}
+                                            onClear={() => { onDatabaseChange(null); onSchemaChange(null); setOpenInner(null); }}
+                                        />
+                                    )}
+                                    {selectedDatabase && (
+                                        <InlineSelector
+                                            label="Schema"
+                                            value={selectedSchema?.label ?? null}
+                                            placeholder="Optional..."
+                                            locked={contextLocked}
+                                            innerKey="schema"
+                                            items={availableSchemas}
+                                            onSelect={schema => { onSchemaChange(schema); }}
+                                            onClear={() => { onSchemaChange(null); setOpenInner(null); }}
+                                        />
+                                    )}
+
+                                    {contextLocked && onNewThread && (
+                                        <>
+                                            <p className="text-[12px] leading-[1.6]" style={{ color: '#818ea9' }}>
+                                                Want to change the data source?{' '}
+                                                <button
+                                                    onClick={() => { onNewThread(); setOptionsOpen(false); }}
+                                                    className="underline underline-offset-2 hover:opacity-70 transition-opacity"
+                                                    style={{ color: '#818ea9' }}
+                                                >
+                                                    Start a new thread.
+                                                </button>
+                                            </p>
+                                        </>
+                                    )}
                                 </div>
                             )}
+
+                            {/* Ghost sliders button */}
+                            <button
+                                onClick={() => setOptionsOpen(v => !v)}
+                                className={cn(
+                                    'relative flex items-center justify-center w-7 h-7 rounded-full transition-colors',
+                                    optionsOpen ? 'bg-gray-3' : 'hover:bg-gray-2',
+                                )}
+                                style={{ color: '#818ea9' }}
+                            >
+                                <SlidersHorizontal className="w-3.5 h-3.5" />
+                                {showDot && (
+                                    <span
+                                        className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full"
+                                        style={{ backgroundColor: '#714DFF' }}
+                                    />
+                                )}
+                            </button>
                         </div>
                     )}
                 </div>
 
-                {/* Send / Stop */}
+                {/* Right: Send / Stop */}
                 {isTyping ? (
                     <button
                         onClick={onStop}
@@ -254,9 +424,7 @@ const InputBox: React.FC<InputBoxProps> = ({
                         disabled={!canSend}
                         className={cn(
                             'flex items-center justify-center w-6 h-6 rounded-full transition-all flex-shrink-0',
-                            canSend
-                                ? 'bg-violet-9 text-white hover:bg-violet-10'
-                                : 'bg-gray-3 cursor-not-allowed'
+                            canSend ? 'bg-violet-9 text-white hover:bg-violet-10' : 'bg-gray-3 cursor-not-allowed'
                         )}
                         style={!canSend ? { color: '#818ea9' } : undefined}
                     >
@@ -955,6 +1123,9 @@ const DuaChat: React.FC = () => {
     const [latestAssistantId, setLatestAssistantId] = useState<string | null>(null);
     const [pendingExecutionSteps, setPendingExecutionSteps] = useState(ALL_EXECUTION_STEPS.length);
     const [selectedSource, setSelectedSource] = useState<DataSource | null>(null);
+    const [selectedDatabase, setSelectedDatabase] = useState<DatabaseOption | null>(null);
+    const [selectedSchema, setSelectedSchema] = useState<SchemaOption | null>(null);
+    const [selectedModel, setSelectedModel] = useState<ModelOption>(MODELS[1]);
     const [requiredBump, setRequiredBump] = useState(0);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -990,6 +1161,17 @@ const DuaChat: React.FC = () => {
     const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         setInput(e.target.value);
         autoResize();
+    };
+
+    const handleSourceChange = (source: DataSource) => {
+        setSelectedSource(source);
+        setSelectedDatabase(null);
+        setSelectedSchema(null);
+    };
+
+    const handleDatabaseChange = (db: DatabaseOption | null) => {
+        setSelectedDatabase(db);
+        setSelectedSchema(null);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -1042,7 +1224,7 @@ const DuaChat: React.FC = () => {
 
     const sendMessage = async () => {
         const trimmed = input.trim();
-        if (!trimmed || isTyping) return;
+        if (!trimmed || isTyping || !selectedSource) return;
 
         let threadId = activeThreadId;
 
@@ -1331,8 +1513,15 @@ const DuaChat: React.FC = () => {
                                 isTyping={isTyping}
                                 textareaRef={textareaRef}
                                 selectedSource={selectedSource}
-                                onSourceChange={setSelectedSource}
-                                sourceLocked={hasMessages}
+                                onSourceChange={handleSourceChange}
+                                selectedDatabase={selectedDatabase}
+                                onDatabaseChange={handleDatabaseChange}
+                                selectedSchema={selectedSchema}
+                                onSchemaChange={setSelectedSchema}
+                                selectedModel={selectedModel}
+                                onModelChange={setSelectedModel}
+                                contextLocked={hasMessages}
+                                onNewThread={createNewThread}
                                 requiredBump={requiredBump}
                             />
                         </div>
@@ -1353,7 +1542,13 @@ const DuaChat: React.FC = () => {
                                 isTyping={isTyping}
                                 textareaRef={textareaRef}
                                 selectedSource={selectedSource}
-                                onSourceChange={setSelectedSource}
+                                onSourceChange={handleSourceChange}
+                                selectedDatabase={selectedDatabase}
+                                onDatabaseChange={handleDatabaseChange}
+                                selectedSchema={selectedSchema}
+                                onSchemaChange={setSelectedSchema}
+                                selectedModel={selectedModel}
+                                onModelChange={setSelectedModel}
                                 requiredBump={requiredBump}
                             />
                         </div>
