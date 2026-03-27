@@ -19,7 +19,6 @@ import {
   LayoutGrid,
   List,
   MoreHorizontal,
-  MoreVertical,
   Plus,
   RotateCcw,
   Search,

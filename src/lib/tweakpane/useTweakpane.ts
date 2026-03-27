@@ -3,7 +3,7 @@ import { Pane } from 'tweakpane';
 import { useDebugMode } from './DebugModeContext';
 
 type TweakpaneParams = Record<string, number | boolean | string>;
-type BindingOptions = Record<string, object>;
+type BindingOptions = Record<string, Record<string, unknown>>;
 
 /**
  * Creates a Tweakpane panel scoped to the calling prototype.
