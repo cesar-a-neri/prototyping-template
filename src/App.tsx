@@ -6,6 +6,13 @@ import { ConfigProvider } from './lib/config';
 import { TooltipProvider } from './components/ui/tooltip';
 import { getPrototypeRoutes } from './utils/prototypes';
 import { PrototypeRoute } from './types';
+import { Agentation } from 'agentation';
+import { DebugModeProvider, useDebugMode } from './lib/tweakpane';
+
+const DebugAgentation: React.FC = () => {
+  const { debugMode } = useDebugMode();
+  return debugMode ? <Agentation /> : null;
+};
 
 const App: React.FC = () => {
   const [routes, setRoutes] = useState<PrototypeRoute[]>([]);
@@ -19,6 +26,7 @@ const App: React.FC = () => {
   }, []);
 
   return (
+    <DebugModeProvider>
     <ThemeProvider defaultTheme="light">
       <ConfigProvider>
         <TooltipProvider>
@@ -57,9 +65,11 @@ const App: React.FC = () => {
               </main>
             </div>
           </Router>
+          {import.meta.env.DEV && <DebugAgentation />}
         </TooltipProvider>
       </ConfigProvider>
     </ThemeProvider>
+    </DebugModeProvider>
   );
 };
 

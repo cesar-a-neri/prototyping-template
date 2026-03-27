@@ -65,6 +65,16 @@ This is a React + TypeScript + Vite prototyping application designed for buildin
                   { value: 'option1', label: 'Option 1' },
                   { value: 'option2', label: 'Option 2' }
               ]
+          },
+          {
+              id: 'myNumber',
+              type: 'number',
+              label: 'Count',
+              description: 'A numeric value',
+              defaultValue: 10,
+              min: 1,
+              max: 100,
+              step: 1
           }
       ]
   };
@@ -120,3 +130,16 @@ src/
 - **Tailwind CSS** for styling
 - **Radix UI** for accessible component primitives
 - **Lucide React** for icons
+
+### Navigation
+
+- **Command palette**: `⌘K` / `Ctrl+K` opens a prototype switcher overlay (`src/components/CommandPalette.tsx`)
+- The app redirects `/` to the first discovered prototype route
+
+### Source Code Viewer
+
+Every prototype automatically gets a source code viewer. The `SourceCodeModal` component (`src/components/SourceCodeModal.tsx`) is wired up via `prototypeSourceModules` in `src/utils/prototypes.ts` — all files in a prototype's directory are bundled as raw strings and made available at runtime.
+
+### Theme System
+
+Semantic CSS custom properties (`--background`, `--primary`, `--border`, etc.) are defined in `src/lib/theme/theme.ts` using Radix Colors and injected by `ThemeProvider`. All Radix color scales are also available as CSS variables (e.g., `var(--blue-9)`, `var(--iris-a3)`). Use `useTheme()` from `@/lib/theme` to read or toggle the current theme mode.
