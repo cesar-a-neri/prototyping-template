@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   AlertTriangle,
   ArrowLeft,
-  ArrowUpCircle,
   CheckCircle2,
   ChevronDown,
   Copy,
@@ -41,27 +40,6 @@ const GithubIcon = ({ size = 16, className }: { size?: number; className?: strin
 
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 
-type StatusType = 'draft' | 'published' | 'ready' | 'error' | 'building' | 'pending' | 'unknown';
-
-const STATUS_CONFIG: Record<StatusType, { label: string; bg: string; text: string; dot: string }> = {
-  draft:     { label: 'Draft',     bg: 'bg-[#F3F4F6]',    text: 'text-[#6B7280]', dot: 'bg-[#9CA3AF]' },
-  published: { label: 'Published', bg: 'bg-[#EEF2FF]',    text: 'text-[#4338CA]', dot: 'bg-[#6366F1]' },
-  ready:     { label: 'Ready',     bg: 'bg-[#00970016]',        text: 'text-[#2A7E3B]', dot: 'bg-[#46A758]' },
-  error:     { label: 'Error',     bg: 'bg-[#FEE2E2]',    text: 'text-[#B91C1C]', dot: 'bg-[#EF4444]' },
-  building:  { label: 'Building',  bg: 'bg-[#DBEAFE]',    text: 'text-[#1D4ED8]', dot: 'bg-[#3B82F6]' },
-  pending:   { label: 'Pending',   bg: 'bg-[#FEF3C7]',    text: 'text-[#B45309]', dot: 'bg-[#F59E0B]' },
-  unknown:   { label: 'Unknown',   bg: 'bg-[#F3F4F6]',    text: 'text-[#6B7280]', dot: 'bg-[#9CA3AF]' },
-};
-
-const StatusBadge = ({ status }: { status: StatusType }) => {
-  const cfg = STATUS_CONFIG[status];
-  return (
-    <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium', cfg.bg, cfg.text)}>
-      <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', cfg.dot)} />
-      {cfg.label}
-    </span>
-  );
-};
 
 const ACCENT = '#714DFF';
 
@@ -382,57 +360,6 @@ const ModalFooter = ({ onCancel, onConfirm, confirmLabel }: { onCancel: () => vo
       {confirmLabel}
     </button>
   </div>
-);
-
-// ─── Promote dialog ───────────────────────────────────────────────────────────
-
-const PromoteDialog = ({ open, onClose, domain }: { open: boolean; onClose: () => void; domain: string }) => (
-  <DialogPrimitive.Root open={open} onOpenChange={v => !v && onClose()}>
-    <DialogPrimitive.Portal>
-      <ModalOverlay />
-      <ModalContent>
-        <ModalHeader title="Promote" onClose={onClose} />
-        <div className="flex flex-col gap-4 text-[14px] text-[#19202F] leading-5">
-          <p>
-            You're about to promote this deployment to <strong>production</strong>. This will make it the active version in that environment.
-          </p>
-          <div className="flex flex-col gap-1">
-            <p>It will be available in the following domain:</p>
-            <a
-              href="#"
-              onClick={e => e.preventDefault()}
-              className="inline-flex items-center gap-1 text-[#714DFF] hover:underline underline-offset-2 w-fit"
-            >
-              {domain}
-              <ExternalLink size={12} className="shrink-0" />
-            </a>
-          </div>
-          <p>Previous versions will remain available for rollback.</p>
-        </div>
-        <ModalFooter onCancel={onClose} onConfirm={onClose} confirmLabel="Promote" />
-      </ModalContent>
-    </DialogPrimitive.Portal>
-  </DialogPrimitive.Root>
-);
-
-// ─── Instant Rollback dialog ──────────────────────────────────────────────────
-
-const RollbackDialog = ({ open, onClose, deploymentId }: { open: boolean; onClose: () => void; deploymentId: string }) => (
-  <DialogPrimitive.Root open={open} onOpenChange={v => !v && onClose()}>
-    <DialogPrimitive.Portal>
-      <ModalOverlay />
-      <ModalContent>
-        <ModalHeader title="Instant Rollback" onClose={onClose} />
-        <div className="flex flex-col gap-4 text-[14px] text-[#19202F] leading-5">
-          <p>
-            You're about to roll back <strong>production</strong> to deployment <strong>{deploymentId}</strong>. This will replace the current version with the selected one.
-          </p>
-          <p>Any changes made after this deployment will be reverted.</p>
-        </div>
-        <ModalFooter onCancel={onClose} onConfirm={onClose} confirmLabel="Confirm Rollback" />
-      </ModalContent>
-    </DialogPrimitive.Portal>
-  </DialogPrimitive.Root>
 );
 
 // ─── Build Uploader ───────────────────────────────────────────────────────────
@@ -944,7 +871,7 @@ const DeployConfirmModal = ({
 
 // ─── Row Actions Dropdown ─────────────────────────────────────────────────────
 
-const RowActionsMenu = ({ row, domain, onDeploy, onCancel, onRetryBuild }: { row: DeployHistoryRow; domain: string; onDeploy?: (id: string) => void; onCancel?: (id: string) => void; onRetryBuild?: (id: string) => void }) => {
+const RowActionsMenu = ({ row, domain: _domain, onDeploy, onCancel, onRetryBuild }: { row: DeployHistoryRow; domain: string; onDeploy?: (id: string) => void; onCancel?: (id: string) => void; onRetryBuild?: (id: string) => void }) => {
   const hasGroup1 = row.status === 'deployed' ||
     row.status === 'inactive' ||
     row.status === 'cancelled' ||
