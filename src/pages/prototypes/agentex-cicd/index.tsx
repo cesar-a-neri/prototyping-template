@@ -20,19 +20,18 @@ import {
   List,
   MoreHorizontal,
   Plus,
-  RotateCcw,
+
   Search,
-  SlidersHorizontal,
   RefreshCw,
   Wand2,
 } from 'lucide-react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faRotate } from '@fortawesome/free-solid-svg-icons';
+import { faCircleUp } from '@fortawesome/free-regular-svg-icons';
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { NavV3, ShowIconsContext, ShowDescriptionsContext } from '../sgp-nav/SgpNav';
 import { cn } from '@/lib/utils';
-import { useTweakpane } from '@/lib/tweakpane';
 
 const GithubIcon = ({ size = 16, className }: { size?: number; className?: string }) => (
   <svg width={size} height={size} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
@@ -84,24 +83,45 @@ const AgenticTag = ({ label = 'Agentic' }: { icon?: React.ElementType; label?: s
   );
 };
 
-type HistoryRowStatus = 'ready' | 'inactive' | 'error' | 'building';
+type HistoryRowStatus = 'building' | 'ready' | 'deployed' | 'inactive' | 'cancelled' | 'error' | 'unknown';
 
-const HISTORY_STATUS: Record<HistoryRowStatus, { label: string; bg: string; text: string; dot: string }> = {
-  ready:    { label: 'Ready',    bg: 'bg-[#00970016]', text: 'text-[#2A7E3B]', dot: 'bg-[#46A758]' },
-  inactive: { label: 'Inactive', bg: 'bg-[#F3F4F6]',   text: 'text-[#6B7280]', dot: 'bg-[#9CA3AF]' },
-  error:    { label: 'Error',    bg: 'bg-[#FEE2E2]',   text: 'text-[#B91C1C]', dot: 'bg-[#EF4444]' },
-  building: { label: 'Building', bg: 'bg-[#DBEAFE]',   text: 'text-[#1D4ED8]', dot: 'bg-[#3B82F6]' },
+const HISTORY_STATUS: Record<HistoryRowStatus, { label: string; bg: string; text: string; dot?: string }> = {
+  building:  { label: 'Building',  bg: 'bg-[#FEF3C7]', text: 'text-[#92400E]', dot: 'bg-[#F59E0B]' },
+  ready:     { label: 'Ready',     bg: 'bg-[#F3F4F6]', text: 'text-[#6B7280]', dot: 'bg-[#9CA3AF]' },
+  deployed:  { label: 'Deployed',  bg: 'bg-[#DCFCE7]', text: 'text-[#15803D]', dot: 'bg-[#22C55E]' },
+  inactive:  { label: 'Inactive',  bg: 'bg-[#F3F4F6]', text: 'text-[#6B7280]', dot: 'bg-[#9CA3AF]' },
+  cancelled: { label: 'Cancelled', bg: 'bg-[#F3F4F6]', text: 'text-[#6B7280]', dot: 'bg-[#9CA3AF]' },
+  error:     { label: 'Error',     bg: 'bg-[#FEE2E2]', text: 'text-[#B91C1C]', dot: 'bg-[#EF4444]' },
+  unknown:   { label: 'Unknown',   bg: 'bg-[#F3F4F6]', text: 'text-[#6B7280]', dot: 'bg-[#9CA3AF]' },
 };
 
 const HistoryStatusBadge = ({ status }: { status: HistoryRowStatus }) => {
   const cfg = HISTORY_STATUS[status];
   return (
     <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium', cfg.bg, cfg.text)}>
-      {status === 'building'
-        ? <Loader2 size={10} className="animate-spin shrink-0" />
-        : <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', cfg.dot)} />
-      }
+      <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', cfg.dot)} />
       {cfg.label}
+    </span>
+  );
+};
+
+const ElapsedTime = ({ startedAt }: { startedAt: number }) => {
+  const [elapsedSeconds, setElapsedSeconds] = useState(() => Math.floor((Date.now() - startedAt) / 1000));
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [startedAt]);
+
+  const minutes = Math.floor(elapsedSeconds / 60);
+  const text = minutes === 0 ? 'Just Now' : minutes === 1 ? '1 minute' : `${minutes} minutes`;
+
+  return (
+    <span className="inline-flex items-center gap-1 text-[12px] text-[#5B6579] leading-4">
+      <Loader2 size={10} className="animate-spin shrink-0" />
+      {text}
     </span>
   );
 };
@@ -112,7 +132,7 @@ interface Agent {
   id: string;
   source: string;
   name: string;
-  status: StatusType;
+  status: HistoryRowStatus;
   hosting?: 'github' | 'scale';
   initialVersion?: string;
   tags?: { icon?: React.ElementType; label: string }[];
@@ -125,7 +145,8 @@ const AGENTS: Agent[] = [
     id: '1',
     source: 'Agentex',
     name: 'Document Extraction Agent',
-    status: 'draft',
+    status: 'deployed',
+    hosting: 'scale',
     description: 'An agentex agent that is designed to do something special with your data.',
     lastModified: 'Jan 1, 2025',
   },
@@ -133,7 +154,7 @@ const AGENTS: Agent[] = [
     id: '2',
     source: 'Agentex',
     name: 'at000-hello-acp',
-    status: 'published',
+    status: 'deployed',
     description: 'An agentex agent that is designed to do something special with your data.',
     lastModified: 'Jan 1, 2025',
   },
@@ -150,7 +171,7 @@ const AGENTS: Agent[] = [
     id: '4',
     source: 'Agentex',
     name: 'ab000-hello-acp',
-    status: 'ready',
+    status: 'inactive',
     tags: [{ label: 'agentic' }],
     description: 'An agentex agent that is designed to do something special with your data.',
     lastModified: 'Jan 1, 2025',
@@ -177,7 +198,7 @@ const AGENTS: Agent[] = [
     id: '7',
     source: 'Agentex',
     name: 'ab000-streaming',
-    status: 'pending',
+    status: 'cancelled',
     tags: [{ label: 'agentic' }],
     description: 'An agentex agent that is designed to do something special with your data.',
     lastModified: 'Jan 1, 2025',
@@ -209,14 +230,14 @@ interface AgentDetailExtras {
 type AgentDetail = Agent & AgentDetailExtras;
 
 const SHORT_ID_BY_AGENT: Record<string, string> = {
-  '1': '16d96d73',
-  '2': '8f4a2c91',
-  '3': 'b3e89142',
-  '4': 'c7d22e18',
-  '5': 'd91f5baa',
-  '6': 'e62a8c33',
-  '7': 'f0349d27',
-  '8': '1a9b4e60',
+  '1': 'xK9mP2wRt',
+  '2': 'nB7qL4yZv',
+  '3': 'rD3hJ8cFp',
+  '4': 'gH6eN1sMa',
+  '5': 'wT5bQ9jXn',
+  '6': 'kY2fC7oUe',
+  '7': 'vA4dI6lWs',
+  '8': 'uM8gR3pKz',
 };
 
 function getAgentDetail(agent: Agent): AgentDetail {
@@ -226,7 +247,7 @@ function getAgentDetail(agent: Agent): AgentDetail {
 
   return {
     ...agent,
-    shortId: SHORT_ID_BY_AGENT[agent.id] ?? `id${agent.id}ab12`,
+    shortId: SHORT_ID_BY_AGENT[agent.id] ?? agent.id.replace(/[^a-zA-Z0-9]/g, '').slice(-9).padStart(9, '0'),
     deploymentId: 'A4s3WNgPq',
     domains: 'sample-domain.app',
     actType: agent.tags?.[0]?.label ?? 'agentic',
@@ -248,16 +269,17 @@ type DeployHistoryRow = {
   current?: boolean;
   status: HistoryRowStatus;
   relativeTime: string;
+  startedAt?: number;
+  buildPhase?: 'build' | 'deploy';
   sourceBranch?: string;
   commitLine?: string;
-  redeployLabel?: string;
   authorLine: string;
 };
 
 const DEPLOYMENT_HISTORY: DeployHistoryRow[] = [
-  { id: 'A4s3WNgPq', current: true, status: 'ready', relativeTime: '3 days ago', sourceBranch: 'main', commitLine: 'ccaf6f3 force deploy', authorLine: 'June 1 by Felix Su' },
-  { id: 'G8h2ZyRxT', status: 'inactive', relativeTime: '7 days ago', redeployLabel: 'Redeploy of D7q4NfBrJ ', authorLine: 'June 3 by github-user' },
-  { id: 'D7q4NfBrJ', status: 'ready', relativeTime: '1 week ago', sourceBranch: 'main', commitLine: 'e4f5b6a ', authorLine: 'May 25 by Sarah Lee' },
+  { id: 'A4s3WNgPq', current: true, status: 'deployed', relativeTime: '3 days ago', sourceBranch: 'main', commitLine: 'ccaf6f3', authorLine: 'June 1 by Felix Su' },
+  { id: 'V 1.1',     status: 'inactive',                relativeTime: '5 days ago',  commitLine: 'a1b2c3d', authorLine: 'May 30 by Felix Su'    },
+  { id: 'D7q4NfBrJ', status: 'inactive', relativeTime: '1 week ago', sourceBranch: 'main', commitLine: 'e4f5b6a', authorLine: 'May 25 by Sarah Lee' },
   { id: 'R5t6OpMqY', status: 'error', relativeTime: '5 weeks ago', sourceBranch: 'main', commitLine: 'b2c3d4e', authorLine: 'June 2 by John Doe' },
   { id: 'S9u8YlHgF', status: 'inactive', relativeTime: '2 months ago', sourceBranch: 'main', commitLine: 'f6g7h8i', authorLine: 'May 28 by Maria Chen' },
   { id: 'Q2w3XyCvZ', status: 'inactive', relativeTime: '2 months ago', sourceBranch: 'main', commitLine: 'j9k0l1m', authorLine: 'June 4 by Liam Smith' },
@@ -265,18 +287,18 @@ const DEPLOYMENT_HISTORY: DeployHistoryRow[] = [
 ];
 
 const SCALE_BUILD_HISTORY: DeployHistoryRow[] = [
-  { id: 'V 1.0', current: true, status: 'ready',    relativeTime: '3 days ago',   commitLine: 'ccaf6f3 force deploy', authorLine: 'June 1 by Felix Su'      },
-  { id: 'V 0.9', status: 'inactive',                relativeTime: '7 days ago',   commitLine: '8f4a2c9 update config', authorLine: 'June 3 by github-user'   },
-  { id: 'V 0.8', status: 'ready',                   relativeTime: '1 week ago',   commitLine: 'e4f5b6a refactor agent', authorLine: 'May 25 by Sarah Lee'     },
-  { id: 'V 0.7', status: 'error',                   relativeTime: '5 weeks ago',  commitLine: 'b2c3d4e fix timeout',   authorLine: 'June 2 by John Doe'      },
-  { id: 'V 0.6', status: 'inactive',                relativeTime: '2 months ago', commitLine: 'f6g7h8i add retries',   authorLine: 'May 28 by Maria Chen'    },
-  { id: 'V 0.5', status: 'inactive',                relativeTime: '2 months ago', commitLine: 'j9k0l1m init build',    authorLine: 'June 4 by Liam Smith'    },
-  { id: 'V 0.4', status: 'inactive',                relativeTime: '2 months ago', commitLine: 'n2o3p4q initial setup', authorLine: 'June 1 by Emma Brown'    },
+  { id: 'V 1.0', current: true, status: 'deployed', relativeTime: '3 days ago',   commitLine: 'ccaf6f3', authorLine: 'June 1 by Felix Su'    },
+  { id: 'V 0.9', status: 'inactive',                relativeTime: '7 days ago',   commitLine: '8f4a2c9', authorLine: 'June 3 by github-user' },
+  { id: 'V 0.8', status: 'inactive',                relativeTime: '1 week ago',   commitLine: 'e4f5b6a', authorLine: 'May 25 by Sarah Lee'   },
+  { id: 'V 0.7', status: 'error',                   relativeTime: '5 weeks ago',  commitLine: 'b2c3d4e', authorLine: 'June 2 by John Doe'    },
+  { id: 'V 0.6', status: 'inactive',                relativeTime: '2 months ago', commitLine: 'f6g7h8i', authorLine: 'May 28 by Maria Chen'  },
+  { id: 'V 0.5', status: 'inactive',                relativeTime: '2 months ago', commitLine: 'j9k0l1m', authorLine: 'June 4 by Liam Smith'  },
+  { id: 'V 0.4', status: 'inactive',                relativeTime: '2 months ago', commitLine: 'n2o3p4q', authorLine: 'June 1 by Emma Brown'  },
 ];
 
 // ─── Agent Card ───────────────────────────────────────────────────────────────
 
-const AgentCard = ({ agent, onSelect }: { agent: Agent; onSelect: (a: Agent) => void }) => (
+const AgentCard = ({ agent, overrideStatus, onSelect }: { agent: Agent; overrideStatus?: HistoryRowStatus; onSelect: (a: Agent) => void }) => (
   <div
     role="button"
     tabIndex={0}
@@ -289,24 +311,14 @@ const AgentCard = ({ agent, onSelect }: { agent: Agent; onSelect: (a: Agent) => 
     }}
     className="bg-white border border-[#E5E7EB] rounded-lg p-6 flex flex-col gap-2 hover:border-[#C5CFE4] hover:shadow-sm transition-all cursor-pointer group h-fit self-start w-full text-left"
   >
-    <div className="flex items-start justify-between gap-2">
-      <div className="flex flex-col gap-1 min-w-0">
-        <span className="text-[15px] font-medium text-[#111827] leading-snug block truncate min-w-0" title={agent.name}>
-          {agent.name}
-        </span>
-      </div>
-      <button
-        type="button"
-        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-[#F3F4F6] text-[#9CA3AF] hover:text-[#6B7280] shrink-0 -mt-0.5 -mr-1"
-        onClick={e => e.stopPropagation()}
-        aria-label="More actions"
-      >
-        <MoreHorizontal size={16} />
-      </button>
+    <div className="flex flex-col gap-1 min-w-0">
+      <span className="text-[15px] font-medium text-[#111827] leading-snug block truncate min-w-0" title={agent.name}>
+        {agent.name}
+      </span>
     </div>
 
     <div className="flex items-center gap-1.5 flex-wrap">
-      <StatusBadge status={agent.status} />
+      <HistoryStatusBadge status={overrideStatus ?? agent.status} />
       {agent.tags?.map((tag, i) => (
         <AgenticTag key={i} icon={tag.icon} label={tag.label} />
       ))}
@@ -344,7 +356,7 @@ const ModalHeader = ({ title, onClose }: { title: string; onClose: () => void })
     <button
       type="button"
       onClick={onClose}
-      className="p-1 rounded-full text-[#9CA3AF] hover:bg-[#F3F4F6] hover:text-[#6B7280] shrink-0 mt-0.5"
+      className="p-1.5 rounded-md text-[#9CA3AF] hover:bg-[#F3F4F6] hover:text-[#6B7280] shrink-0 mt-0.5"
       aria-label="Close"
     >
       <X size={16} />
@@ -578,6 +590,12 @@ const WideModalContent = ({ children }: { children: React.ReactNode }) => (
   </DialogPrimitive.Content>
 );
 
+const MediumModalContent = ({ children }: { children: React.ReactNode }) => (
+  <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 w-[640px] max-w-[calc(100vw-48px)] -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-[0px_12px_32px_-16px_rgba(0,0,0,0.3),0px_12px_60px_0px_rgba(0,0,0,0.15)] flex flex-col gap-5 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 outline-none">
+    {children}
+  </DialogPrimitive.Content>
+);
+
 const FormField = ({ label, children }: { label: string; children: React.ReactNode }) => (
   <div className="flex flex-col gap-1.5">
     <label className="text-[13px] font-medium text-[#5B6579]">{label}</label>
@@ -645,20 +663,42 @@ const CreateAgentDialog = ({
 
 // ─── Add Build dialog ─────────────────────────────────────────────────────────
 
+function suggestNextVersion(builds: DeployHistoryRow[]): string {
+  const pattern = /^V\s*(\d+)\.(\d+)$/i;
+  let maxMajor = 1, maxMinor = -1;
+  builds.forEach(b => {
+    const m = b.id.match(pattern);
+    if (m) {
+      const major = parseInt(m[1]), minor = parseInt(m[2]);
+      if (major > maxMajor || (major === maxMajor && minor > maxMinor)) {
+        maxMajor = major; maxMinor = minor;
+      }
+    }
+  });
+  return maxMinor < 0 ? 'V 1.0' : `V ${maxMajor}.${maxMinor + 1}`;
+}
+
 const AddBuildDialog = ({
   open,
   onClose,
   onConfirm,
+  suggestedVersion,
 }: {
   open: boolean;
   onClose: () => void;
   onConfirm: (version: string) => void;
+  suggestedVersion?: string;
 }) => {
-  const [buildVersion, setBuildVersion] = useState('');
+  const [buildVersion, setBuildVersion] = useState(suggestedVersion ?? '');
+
+  useEffect(() => {
+    if (open) setBuildVersion(suggestedVersion ?? '');
+  }, [open, suggestedVersion]);
 
   const handleConfirm = () => {
-    onConfirm(buildVersion.trim() || 'V 1.x');
+    onConfirm(buildVersion.trim() || suggestedVersion || 'V 1.x');
     setBuildVersion('');
+    onClose();
   };
 
   return (
@@ -685,10 +725,231 @@ const AddBuildDialog = ({
   );
 };
 
+// ─── YAML Editor ─────────────────────────────────────────────────────────────
+
+const MONO_FONT = "'ui-monospace','SFMono-Regular','Menlo','Monaco','Consolas',monospace";
+const CODE_FS = 12;
+const CODE_LH = 1.6;
+const CODE_PX = 14;
+const CODE_PY = 8;
+const LN_WIDTH = 38;
+
+function highlightYaml(code: string): string {
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return code.split('\n').map(line => {
+    const e = esc(line);
+    if (/^\s*#/.test(line)) return `<span style="color:#8B95A8">${e}</span>`;
+    const kv = line.match(/^(\s*)([\w.-]+)(\s*:\s*)(.*)?$/);
+    if (kv) {
+      const [, indent, key, sep, rest = ''] = kv;
+      let val = '';
+      if (rest) {
+        if (/^["']/.test(rest)) val = `<span style="color:#0A6640">${esc(rest)}</span>`;
+        else if (/^-?\d+(\.\d+)?$/.test(rest.trim())) val = `<span style="color:#953800">${esc(rest)}</span>`;
+        else if (/^(true|false|null|yes|no|~)$/i.test(rest.trim())) val = `<span style="color:#953800">${esc(rest)}</span>`;
+        else val = `<span style="color:#374151">${esc(rest)}</span>`;
+      }
+      return `${esc(indent)}<span style="color:#1D4ED8">${esc(key)}</span><span style="color:#8B95A8">${esc(sep)}</span>${val}`;
+    }
+    const li = line.match(/^(\s*)(-)(\s+)(.*)?$/);
+    if (li) {
+      const [, indent, dash, space, val = ''] = li;
+      return `${esc(indent)}<span style="color:#8B95A8">${esc(dash)}</span>${esc(space)}<span style="color:#0A6640">${esc(val)}</span>`;
+    }
+    return e || '';
+  }).join('\n');
+}
+
+const YamlEditor = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => {
+  const taRef = useRef<HTMLTextAreaElement>(null);
+  const preRef = useRef<HTMLPreElement>(null);
+  const lines = value.split('\n');
+  const lineH = CODE_FS * CODE_LH;
+  const minH = lines.length * lineH + CODE_PY * 2;
+
+  const syncScroll = () => {
+    if (taRef.current && preRef.current) preRef.current.scrollTop = taRef.current.scrollTop;
+  };
+
+  const shared: React.CSSProperties = {
+    fontFamily: MONO_FONT,
+    fontSize: CODE_FS,
+    lineHeight: `${CODE_LH}`,
+    padding: `${CODE_PY}px ${CODE_PX}px`,
+    margin: 0,
+    whiteSpace: 'pre',
+    wordBreak: 'normal' as const,
+    overflowWrap: 'normal' as const,
+  };
+
+  return (
+    <div style={{ display: 'flex', background: '#F8FAFC', minHeight: minH, overflow: 'hidden' }}>
+      <div style={{
+        fontFamily: MONO_FONT, fontSize: CODE_FS, lineHeight: `${CODE_LH}`,
+        paddingTop: CODE_PY, paddingBottom: CODE_PY, paddingLeft: 6, paddingRight: 6,
+        minWidth: LN_WIDTH, textAlign: 'right', color: '#B0BCCE',
+        background: '#F0F4F9', borderRight: '1px solid #E1E8F0',
+        userSelect: 'none', flexShrink: 0,
+      }}>
+        {lines.map((_, i) => <div key={i} style={{ height: lineH }}>{i + 1}</div>)}
+      </div>
+      <div style={{ position: 'relative', flex: 1, overflow: 'hidden' }}>
+        <pre ref={preRef} aria-hidden style={{
+          ...shared, position: 'absolute', inset: 0, color: '#374151',
+          overflow: 'hidden', pointerEvents: 'none', border: 'none', outline: 'none',
+        }} dangerouslySetInnerHTML={{ __html: highlightYaml(value) }} />
+        <textarea ref={taRef} value={value} onChange={e => onChange(e.target.value)}
+          onScroll={syncScroll} spellCheck={false} autoComplete="off"
+          style={{
+            ...shared, position: 'relative', display: 'block',
+            width: '100%', minHeight: minH, resize: 'none',
+            color: 'transparent', caretColor: '#374151',
+            background: 'transparent', border: 'none', outline: 'none',
+          }}
+        />
+      </div>
+    </div>
+  );
+};
+
+// ─── Deploy Confirm Modal ─────────────────────────────────────────────────────
+
+const SAMPLE_MANIFEST = `name: document-extraction-agent
+version: 1.0.0
+entrypoint: agent.py
+description: Extracts structured data from documents
+
+tools:
+  - web_search
+  - code_interpreter
+  - file_reader
+
+memory:
+  type: persistent
+  ttl: 3600
+
+scaling:
+  min_instances: 1
+  max_instances: 5`;
+
+const SAMPLE_ENV_YAML = `API_KEY: ""
+MODEL_NAME: gpt-4o
+TEMPERATURE: "0.7"
+MAX_TOKENS: 4096`;
+
+const DeployConfirmModal = ({
+  open,
+  buildId,
+  isFirstDeploy,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean;
+  buildId: string;
+  isFirstDeploy: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) => {
+  const [manifestOpen, setManifestOpen] = useState(false);
+  const [envOpen, setEnvOpen] = useState(false);
+  const [manifest, setManifest] = useState(SAMPLE_MANIFEST);
+  const [envYaml, setEnvYaml] = useState(SAMPLE_ENV_YAML);
+
+  useEffect(() => {
+    if (open) {
+      setManifestOpen(false);
+      setEnvOpen(false);
+      setManifest(SAMPLE_MANIFEST);
+      setEnvYaml(SAMPLE_ENV_YAML);
+    }
+  }, [open]);
+
+  const handleConfirm = () => { onConfirm(); onClose(); };
+  const Wrapper = isFirstDeploy ? MediumModalContent : ModalContent;
+
+  return (
+    <DialogPrimitive.Root open={open} onOpenChange={v => !v && onClose()}>
+      <DialogPrimitive.Portal>
+        <ModalOverlay />
+        <Wrapper>
+          <ModalHeader
+            title={isFirstDeploy ? 'Deploy Build' : 'Redeploy Build'}
+            onClose={onClose}
+          />
+
+          {isFirstDeploy ? (
+            <div className="flex flex-col gap-3">
+              <p className="text-[14px] text-[#5B6579] leading-5">
+                Optionally review and update your configuration before deploying.
+              </p>
+
+              <div className="border border-[#D1DAEB] rounded-lg overflow-hidden">
+                {/* Manifest file */}
+                <button
+                  type="button"
+                  onClick={() => setManifestOpen(v => !v)}
+                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-[#FAFBFF] transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0"><path d="M4 1.5C3.71875 1.5 3.5 1.71875 3.5 2V14C3.5 14.2812 3.71875 14.5 4 14.5H12C12.2812 14.5 12.5 14.2812 12.5 14V6.5H9.75C8.5 6.5 7.5 5.5 7.5 4.25V1.5H4ZM9 2.125V4.25C9 4.65625 9.34375 5 9.75 5H11.875L9 2.125ZM4 0H8.1875C8.71875 0 9.21875 0.21875 9.59375 0.59375L13.4062 4.40625C13.7812 4.78125 14 5.3125 14 5.84375V14C14 15.0938 13.0938 16 12 16H4C2.90625 16 2 15.0938 2 14V2C2 0.90625 2.90625 0 4 0ZM7.3125 9.25L6.25 10.5L7.3125 11.75C7.59375 12.0625 7.5625 12.5625 7.25 12.8125C6.9375 13.0938 6.4375 13.0625 6.1875 12.75L4.6875 11C4.4375 10.7188 4.4375 10.2812 4.6875 10L6.1875 8.25C6.4375 7.9375 6.9375 7.90625 7.25 8.1875C7.5625 8.4375 7.59375 8.9375 7.3125 9.25ZM9.8125 8.25L11.3125 10C11.5625 10.2812 11.5625 10.7188 11.3125 11L9.8125 12.75C9.5625 13.0625 9.09375 13.0938 8.75 12.8125C8.4375 12.5625 8.40625 12.0938 8.6875 11.75L9.75 10.5L8.6875 9.25C8.40625 8.9375 8.4375 8.4375 8.75 8.1875C9.0625 7.90625 9.5625 7.9375 9.8125 8.25Z" fill="#AFBCD8"/></svg>
+                    <span className="text-[12px] font-medium text-[#19202F]">Manifest File</span>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-[12px] text-[#818EA9]">Last edited Jan 15, 2025</span>
+                    <ChevronDown size={14} className={cn('text-[#818EA9] transition-transform duration-150 shrink-0', manifestOpen && 'rotate-180')} />
+                  </div>
+                </button>
+                {manifestOpen && (
+                  <div className="border-t border-[#D1DAEB] overflow-hidden">
+                    <YamlEditor value={manifest} onChange={setManifest} />
+                  </div>
+                )}
+
+                {/* Environment variables */}
+                <div className="border-t border-[#D1DAEB]">
+                  <button
+                    type="button"
+                    onClick={() => setEnvOpen(v => !v)}
+                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-[#FAFBFF] transition-colors"
+                  >
+                      <div className="flex items-center gap-2">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0"><path d="M0.75 2.25H3.625C3.9375 1.25 4.875 0.5 6 0.5C7.125 0.5 8.0625 1.25 8.375 2.25H15.25C15.6562 2.25 16 2.59375 16 3C16 3.40625 15.6562 3.75 15.25 3.75H8.375C8.0625 4.78125 7.125 5.5 6 5.5C4.875 5.5 3.9375 4.78125 3.625 3.75H0.75C0.34375 3.75 0 3.40625 0 3C0 2.59375 0.34375 2.25 0.75 2.25ZM0.75 7.25H8.625C8.9375 6.25 9.875 5.5 11 5.5C12.125 5.5 13.0625 6.25 13.375 7.25H15.25C15.6562 7.25 16 7.59375 16 8C16 8.40625 15.6562 8.75 15.25 8.75H13.375C13.0625 9.78125 12.125 10.5 11 10.5C9.875 10.5 8.9375 9.78125 8.625 8.75H0.75C0.34375 8.75 0 8.40625 0 8C0 7.59375 0.34375 7.25 0.75 7.25ZM0.75 12.25H2.625C2.9375 11.25 3.875 10.5 5 10.5C6.125 10.5 7.0625 11.25 7.375 12.25H15.25C15.6562 12.25 16 12.5938 16 13C16 13.4062 15.6562 13.75 15.25 13.75H7.375C7.0625 14.7812 6.125 15.5 5 15.5C3.875 15.5 2.9375 14.7812 2.625 13.75H0.75C0.34375 13.75 0 13.4062 0 13C0 12.5938 0.34375 12.25 0.75 12.25ZM5 14C5.5625 14 6 13.5625 6 13C6 12.4375 5.5625 12 5 12C4.4375 12 4 12.4375 4 13C4 13.5625 4.4375 14 5 14ZM11 9C11.5625 9 12 8.5625 12 8C12 7.4375 11.5625 7 11 7C10.4375 7 10 7.4375 10 8C10 8.5625 10.4375 9 11 9ZM5 3C5 3.5625 5.4375 4 6 4C6.5625 4 7 3.5625 7 3C7 2.4375 6.5625 2 6 2C5.4375 2 5 2.4375 5 3Z" fill="#AFBCD8"/></svg>
+                        <span className="text-[12px] font-medium text-[#19202F]">Environment Variables</span>
+                      </div>
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-[12px] text-[#818EA9]">Last edited Jan 10, 2025</span>
+                        <ChevronDown size={14} className={cn('text-[#818EA9] transition-transform duration-150 shrink-0', envOpen && 'rotate-180')} />
+                      </div>
+                  </button>
+                  {envOpen && (
+                    <div className="border-t border-[#D1DAEB] overflow-hidden">
+                      <YamlEditor value={envYaml} onChange={setEnvYaml} />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="text-[14px] text-[#5B6579] leading-5">
+              This will make <strong className="text-[#19202F] font-medium">{buildId}</strong> the active build. The current deployment will be moved to Inactive.
+            </p>
+          )}
+
+          <ModalFooter onCancel={onClose} onConfirm={handleConfirm} confirmLabel="Deploy" />
+        </Wrapper>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
+  );
+};
+
 // ─── Row Actions Dropdown ─────────────────────────────────────────────────────
 
-const RowActionsMenu = ({ row, domain }: { row: DeployHistoryRow; domain: string }) => {
-  const [dialog, setDialog] = useState<'promote' | 'rollback' | null>(null);
+const RowActionsMenu = ({ row, domain, onDeploy, onCancel, onRetryBuild }: { row: DeployHistoryRow; domain: string; onDeploy?: (id: string) => void; onCancel?: (id: string) => void; onRetryBuild?: (id: string) => void }) => {
+  const hasGroup1 = row.status === 'deployed' ||
+    row.status === 'inactive' ||
+    row.status === 'cancelled' ||
+    row.status === 'building' ||
+    row.status === 'ready';
 
   return (
     <>
@@ -709,97 +970,86 @@ const RowActionsMenu = ({ row, domain }: { row: DeployHistoryRow; domain: string
             sideOffset={4}
             className="z-50 w-[211px] rounded-lg border border-[rgba(0,54,175,0.07)] bg-white p-2 shadow-[0px_0px_4px_rgba(0,0,0,0.2),0px_0px_0px_1px_rgba(0,54,175,0.07)] animate-in fade-in-0 zoom-in-95"
           >
-            {/* Group 1: Open / Promote / Instant Rollback */}
+            {/* Group 1: primary actions (status-dependent) */}
             <DropdownMenuPrimitive.Group>
-              {[
-                { label: 'Open',             rightIcon: ExternalLink,  action: undefined          },
-                { label: 'Promote',          rightIcon: ArrowUpCircle, action: () => setDialog('promote')  },
-                { label: 'Instant Rollback', rightIcon: RotateCcw,     action: () => setDialog('rollback') },
-              ].map(({ label, rightIcon: RightIcon, action }) => (
+              {row.status === 'deployed' && (
                 <DropdownMenuPrimitive.Item
-                  key={label}
-                  onSelect={action}
                   className="flex items-center gap-1 px-1 py-1.5 rounded text-[14px] text-[#19202F] cursor-default select-none outline-none hover:bg-[#F3F4F6] focus:bg-[#F3F4F6]"
                 >
-                  <span className="flex-1">{label}</span>
-                  <RightIcon size={14} className="shrink-0 text-[#818EA9]" />
+                  <span className="flex-1">Open</span>
+                  <ExternalLink size={14} className="shrink-0 text-[#AFBCD8]" />
                 </DropdownMenuPrimitive.Item>
-              ))}
+              )}
+              {(row.status === 'inactive' || (row.status === 'cancelled' && row.buildPhase === 'deploy')) && (
+                <DropdownMenuPrimitive.Item
+                  onSelect={() => onDeploy?.(row.id)}
+                  className="flex items-center gap-1 px-1 py-1.5 rounded text-[14px] text-[#19202F] cursor-default select-none outline-none hover:bg-[#F3F4F6] focus:bg-[#F3F4F6]"
+                >
+                  <span className="flex-1">Deploy</span>
+                  <FontAwesomeIcon icon={faCircleUp} className="shrink-0 text-[#AFBCD8]" style={{ width: 14, height: 14 }} />
+                </DropdownMenuPrimitive.Item>
+              )}
+              {row.status === 'cancelled' && row.buildPhase !== 'deploy' && (
+                <DropdownMenuPrimitive.Item
+                  onSelect={() => onRetryBuild?.(row.id)}
+                  className="flex items-center gap-1 px-1 py-1.5 rounded text-[14px] text-[#19202F] cursor-default select-none outline-none hover:bg-[#F3F4F6] focus:bg-[#F3F4F6]"
+                >
+                  <span className="flex-1">Retry Build</span>
+                </DropdownMenuPrimitive.Item>
+              )}
+              {(row.status === 'building' || row.status === 'ready') && (
+                <DropdownMenuPrimitive.Item
+                  onSelect={() => onCancel?.(row.id)}
+                  className="flex items-center gap-1 px-1 py-1.5 rounded text-[14px] text-[#DC2626] cursor-default select-none outline-none hover:bg-[#FEF2F2] focus:bg-[#FEF2F2]"
+                >
+                  <span className="flex-1">Cancel</span>
+                </DropdownMenuPrimitive.Item>
+              )}
             </DropdownMenuPrimitive.Group>
 
-            {/* Group 2: Deploy / Copy URL / View Source */}
-            <DropdownMenuPrimitive.Separator className="my-1 h-px bg-[rgba(0,54,175,0.07)]" />
+            {/* Group 2: Copy URL (deployed only) / View Source */}
+            {hasGroup1 && <DropdownMenuPrimitive.Separator className="my-1 h-px bg-[rgba(0,54,175,0.07)]" />}
             <DropdownMenuPrimitive.Group>
-              {([...(!row.current ? ['Deploy'] : []), 'Copy URL', 'View Source'] as string[]).map(label => (
+              {row.status === 'deployed' && (
                 <DropdownMenuPrimitive.Item
-                  key={label}
                   className="flex items-center gap-1 px-1 py-1.5 rounded text-[14px] text-[#19202F] cursor-default select-none outline-none hover:bg-[#F3F4F6] focus:bg-[#F3F4F6]"
                 >
-                  <span className="flex-1">{label}</span>
+                  <span className="flex-1">Copy URL</span>
                 </DropdownMenuPrimitive.Item>
-              ))}
+              )}
+              <DropdownMenuPrimitive.Item
+                className="flex items-center gap-1 px-1 py-1.5 rounded text-[14px] text-[#19202F] cursor-default select-none outline-none hover:bg-[#F3F4F6] focus:bg-[#F3F4F6]"
+              >
+                <span className="flex-1">View Source</span>
+              </DropdownMenuPrimitive.Item>
             </DropdownMenuPrimitive.Group>
 
-            {/* Group 3: View Evaluations / View Traces */}
-            <DropdownMenuPrimitive.Separator className="my-1 h-px bg-[rgba(0,54,175,0.07)]" />
-            <DropdownMenuPrimitive.Group>
-              {['View Evaluations', 'View Traces'].map(label => (
-                <DropdownMenuPrimitive.Item
-                  key={label}
-                  className="flex items-center gap-1 px-1 py-1.5 rounded text-[14px] text-[#19202F] cursor-default select-none outline-none hover:bg-[#F3F4F6] focus:bg-[#F3F4F6]"
-                >
-                  <span className="flex-1">{label}</span>
-                </DropdownMenuPrimitive.Item>
-              ))}
-            </DropdownMenuPrimitive.Group>
+            {/* Group 3: View Evaluations / View Traces (deployed or inactive only) */}
+            {(row.status === 'deployed' || row.status === 'inactive') && (
+              <>
+                <DropdownMenuPrimitive.Separator className="my-1 h-px bg-[rgba(0,54,175,0.07)]" />
+                <DropdownMenuPrimitive.Group>
+                  {['View Evaluations', 'View Traces'].map(label => (
+                    <DropdownMenuPrimitive.Item
+                      key={label}
+                      className="flex items-center gap-1 px-1 py-1.5 rounded text-[14px] text-[#19202F] cursor-default select-none outline-none hover:bg-[#F3F4F6] focus:bg-[#F3F4F6]"
+                    >
+                      <span className="flex-1">{label}</span>
+                    </DropdownMenuPrimitive.Item>
+                  ))}
+                </DropdownMenuPrimitive.Group>
+              </>
+            )}
           </DropdownMenuPrimitive.Content>
         </DropdownMenuPrimitive.Portal>
       </DropdownMenuPrimitive.Root>
 
-      <PromoteDialog
-        open={dialog === 'promote'}
-        onClose={() => setDialog(null)}
-        domain={domain}
-      />
-      <RollbackDialog
-        open={dialog === 'rollback'}
-        onClose={() => setDialog(null)}
-        deploymentId={row.id}
-      />
     </>
   );
 };
 
 const DetailValue = ({ children, className }: { children: React.ReactNode; className?: string }) => (
   <p className={cn('text-[14px] text-[#19202F] leading-5', className)}>{children}</p>
-);
-
-const AgentActionsMenu = () => (
-  <DropdownMenuPrimitive.Root>
-    <DropdownMenuPrimitive.Trigger asChild>
-      <button
-        type="button"
-        className="inline-flex items-center gap-1.5 h-8 px-2 rounded text-[14px] font-medium text-[#5B6579] bg-transparent hover:bg-[#F3F4F6] hover:text-[#19202F] transition-colors data-[state=open]:bg-[#F3F4F6] data-[state=open]:text-[#19202F]"
-        aria-label="Agent actions"
-      >
-        <MoreHorizontal size={16} />
-      </button>
-    </DropdownMenuPrimitive.Trigger>
-    <DropdownMenuPrimitive.Portal>
-      <DropdownMenuPrimitive.Content
-        align="end"
-        sideOffset={4}
-        className="z-50 w-[188px] rounded-lg border border-[rgba(0,54,175,0.07)] bg-white p-2 shadow-[0px_0px_4px_rgba(0,0,0,0.2),0px_0px_0px_1px_rgba(0,54,175,0.07)] animate-in fade-in-0 zoom-in-95"
-      >
-        <DropdownMenuPrimitive.Item className="flex items-center gap-1 px-1 py-1.5 rounded text-[14px] text-[#19202F] cursor-default select-none outline-none hover:bg-[#F3F4F6] focus:bg-[#F3F4F6]">
-          <span className="flex-1">Duplicate Agent</span>
-        </DropdownMenuPrimitive.Item>
-        <DropdownMenuPrimitive.Item className="flex items-center gap-1 px-1 py-1.5 rounded text-[14px] text-[#DC2626] cursor-default select-none outline-none hover:bg-[#FEF2F2] focus:bg-[#FEF2F2]">
-          <span className="flex-1">Delete Agent</span>
-        </DropdownMenuPrimitive.Item>
-      </DropdownMenuPrimitive.Content>
-    </DropdownMenuPrimitive.Portal>
-  </DropdownMenuPrimitive.Root>
 );
 
 // ─── Build Detail View ────────────────────────────────────────────────────────
@@ -933,11 +1183,17 @@ const BuildDetailView = ({
   agentName,
   domain,
   onBack,
+  onDeploy,
+  onCancel,
+  onRetryBuild,
 }: {
   row: DeployHistoryRow;
   agentName: string;
   domain: string;
   onBack: () => void;
+  onDeploy?: (id: string) => void;
+  onCancel?: (id: string) => void;
+  onRetryBuild?: (id: string) => void;
 }) => (
   <div className="flex flex-col w-full pb-10 gap-6">
     {/* Header row */}
@@ -950,7 +1206,7 @@ const BuildDetailView = ({
         <ArrowLeft size={16} strokeWidth={2} />
         Back to {agentName}
       </button>
-      <RowActionsMenu row={row} domain={domain} />
+      <RowActionsMenu row={row} domain={domain} onDeploy={onDeploy} onCancel={onCancel} onRetryBuild={onRetryBuild} />
     </div>
 
     {/* Build header */}
@@ -987,45 +1243,168 @@ const BuildDetailView = ({
   </div>
 );
 
-const AgentDetailView = ({ agent, onBack, hosting }: { agent: Agent; onBack: () => void; hosting: string }) => {
+function computeAgentStatus(builds: DeployHistoryRow[]): HistoryRowStatus {
+  const hasDeployed = builds.some(b => b.status === 'deployed');
+  if (hasDeployed) return 'deployed';
+  if (builds.some(b => b.status === 'building')) return 'building';
+  if (builds.some(b => b.status === 'ready')) return 'ready';
+  if (builds.some(b => b.status === 'cancelled')) return 'cancelled';
+  if (builds.length > 0 && builds.every(b => b.status === 'error')) return 'error';
+  if (builds.length > 0 && builds.every(b => b.status === 'inactive' || b.status === 'error')) return 'inactive';
+  return 'unknown';
+}
+
+// Shapes a build history so computeAgentStatus matches the agent's card status.
+function getBuildHistoryForAgent(agent: Agent, isScale: boolean): DeployHistoryRow[] {
+  if (agent.status === 'deployed') {
+    return isScale ? [...SCALE_BUILD_HISTORY] : [...DEPLOYMENT_HISTORY];
+  }
+  const base = isScale ? SCALE_BUILD_HISTORY : DEPLOYMENT_HISTORY;
+  const [head, ...tail] = base;
+  const inactiveTail = tail.map(b => ({ ...b, status: 'inactive' as HistoryRowStatus, current: false }));
+
+  switch (agent.status) {
+    case 'ready':
+      return [
+        { ...head, status: 'ready', current: false, commitLine: 'f3a9b1c' },
+        ...inactiveTail,
+      ];
+    case 'building':
+      return [
+        { ...head, status: 'building', buildPhase: 'build' as const, startedAt: Date.now() - 8000, current: false, commitLine: undefined },
+        ...inactiveTail,
+      ];
+    case 'error':
+      return [
+        { ...head, status: 'error', current: false },
+        ...inactiveTail,
+      ];
+    case 'inactive':
+      return base.map(b => ({ ...b, status: 'inactive' as HistoryRowStatus, current: false }));
+    case 'cancelled':
+      return [
+        { ...head, status: 'cancelled', buildPhase: 'build' as const, current: false, commitLine: undefined },
+        ...inactiveTail,
+      ];
+    case 'unknown':
+      return base.map(b => ({ ...b, status: 'unknown' as HistoryRowStatus, current: false }));
+    default:
+      return isScale ? [...SCALE_BUILD_HISTORY] : [...DEPLOYMENT_HISTORY];
+  }
+}
+
+const AgentDetailView = ({ agent, onBack, hosting, onStatusChange }: { agent: Agent; onBack: () => void; hosting: string; onStatusChange?: (status: HistoryRowStatus) => void }) => {
   const d = getAgentDetail(agent);
   const desc = detailDescription(agent);
   const isScale = hosting === 'scale';
   const isNewDeploy = !!agent.initialVersion;
-  const baseBuildHistory = isNewDeploy ? [] : (isScale ? SCALE_BUILD_HISTORY : DEPLOYMENT_HISTORY);
 
-  const [extraBuilds, setExtraBuilds] = useState<DeployHistoryRow[]>(() =>
-    isNewDeploy
-      ? [{ id: agent.initialVersion!, status: 'building', relativeTime: 'Just now', authorLine: 'Just now by you' }]
-      : [],
-  );
+  const [builds, setBuilds] = useState<DeployHistoryRow[]>(() => {
+    if (isNewDeploy) {
+      return [{
+        id: agent.initialVersion!,
+        status: 'building',
+        buildPhase: 'build',
+        relativeTime: 'Just now',
+        startedAt: Date.now(),
+        authorLine: 'Just now by you',
+      }];
+    }
+    return getBuildHistoryForAgent(agent, isScale);
+  });
+
   const [addBuildOpen, setAddBuildOpen] = useState(false);
-  const [selectedBuild, setSelectedBuild] = useState<DeployHistoryRow | null>(null);
-  const allBuilds = [...extraBuilds, ...baseBuildHistory];
+  const [selectedBuildId, setSelectedBuildId] = useState<string | null>(null);
+  const timerRefs = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => {
-    if (!isNewDeploy) return;
-    const timer = setTimeout(() => {
-      setExtraBuilds(prev =>
-        prev.map(b =>
-          b.id === agent.initialVersion
-            ? { ...b, status: 'ready', current: true, commitLine: `${Math.random().toString(16).slice(2, 9)} deploy ${agent.initialVersion}` }
-            : b,
-        ),
-      );
-    }, 10000);
-    return () => clearTimeout(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    builds.forEach(build => {
+      if (build.status === 'building' && build.startedAt && !timerRefs.current.has(build.id)) {
+        const elapsed = Date.now() - build.startedAt;
+        const totalTime = build.buildPhase === 'deploy' ? 15000 : 20000;
+        const delay = Math.max(0, totalTime - elapsed);
+
+        const timer = setTimeout(() => {
+          timerRefs.current.delete(build.id);
+          if (build.buildPhase === 'deploy') {
+            setBuilds(prev => prev.map(b => {
+              if (b.id === build.id) return { ...b, status: 'deployed' as HistoryRowStatus, current: true, startedAt: undefined, buildPhase: undefined };
+              if (b.status === 'deployed') return { ...b, status: 'inactive' as HistoryRowStatus, current: false };
+              return b;
+            }));
+          } else {
+            const hash = Math.random().toString(16).slice(2, 9);
+            setBuilds(prev => prev.map(b =>
+              b.id === build.id
+                ? { ...b, status: 'ready' as HistoryRowStatus, startedAt: undefined, buildPhase: undefined, commitLine: hash }
+                : b,
+            ));
+          }
+        }, delay);
+
+        timerRefs.current.set(build.id, timer);
+      }
+    });
+  }, [builds]);
+
+  useEffect(() => {
+    const timers = timerRefs.current;
+    return () => { timers.forEach(clearTimeout); timers.clear(); };
   }, []);
 
+  const onStatusChangeRef = useRef(onStatusChange);
+  useEffect(() => { onStatusChangeRef.current = onStatusChange; });
+  useEffect(() => {
+    onStatusChangeRef.current?.(computeAgentStatus(builds));
+  }, [builds]);
+
   const handleAddBuild = (version: string) => {
-    setExtraBuilds(prev => [{
+    setBuilds(prev => [{
       id: version,
-      status: 'ready',
+      status: 'building',
+      buildPhase: 'build',
       relativeTime: 'Just now',
+      startedAt: Date.now(),
       authorLine: 'Just now by you',
     }, ...prev]);
   };
+
+  const [deployPending, setDeployPending] = useState<{ buildId: string; isFirstDeploy: boolean } | null>(null);
+
+  const handleDeploy = (buildId: string) => {
+    const build = builds.find(b => b.id === buildId);
+    if (!build) return;
+    setDeployPending({ buildId, isFirstDeploy: build.status === 'ready' });
+  };
+
+  const executeDeploy = (buildId: string) => {
+    setBuilds(prev => prev.map(b =>
+      b.id === buildId
+        ? { ...b, status: 'building' as HistoryRowStatus, buildPhase: 'deploy' as const, startedAt: Date.now() }
+        : b,
+    ));
+  };
+
+  const handleCancel = (buildId: string) => {
+    const timer = timerRefs.current.get(buildId);
+    if (timer) { clearTimeout(timer); timerRefs.current.delete(buildId); }
+    // Keep buildPhase so we know what kind of action to offer when cancelled
+    setBuilds(prev => prev.map(b =>
+      b.id === buildId
+        ? { ...b, status: 'cancelled' as HistoryRowStatus, startedAt: undefined }
+        : b,
+    ));
+  };
+
+  const handleRetryBuild = (buildId: string) => {
+    setBuilds(prev => prev.map(b =>
+      b.id === buildId
+        ? { ...b, status: 'building' as HistoryRowStatus, buildPhase: 'build' as const, startedAt: Date.now(), commitLine: undefined }
+        : b,
+    ));
+  };
+
+  const selectedBuild = selectedBuildId ? builds.find(b => b.id === selectedBuildId) ?? null : null;
 
   if (selectedBuild) {
     return (
@@ -1033,7 +1412,10 @@ const AgentDetailView = ({ agent, onBack, hosting }: { agent: Agent; onBack: () 
         row={selectedBuild}
         agentName={agent.name}
         domain={d.domains}
-        onBack={() => setSelectedBuild(null)}
+        onBack={() => setSelectedBuildId(null)}
+        onDeploy={handleDeploy}
+        onCancel={handleCancel}
+        onRetryBuild={handleRetryBuild}
       />
     );
   }
@@ -1049,7 +1431,6 @@ const AgentDetailView = ({ agent, onBack, hosting }: { agent: Agent; onBack: () 
           <ArrowLeft size={16} strokeWidth={2} />
           Back to Agents
         </button>
-        <AgentActionsMenu />
       </div>
 
       <div className="flex flex-col gap-8 w-full">
@@ -1059,7 +1440,7 @@ const AgentDetailView = ({ agent, onBack, hosting }: { agent: Agent; onBack: () 
             <span className="text-[14px] text-[#5B6579]">{d.source}</span>
             <h1 className="text-[28px] font-semibold text-[#111827] tracking-[-0.4px] leading-9">{d.name}</h1>
             <div className="flex items-center gap-1 min-w-0">
-              <span className="text-[14px] text-[#5B6579] truncate font-mono tabular-nums">{d.shortId}</span>
+              <span className="text-[14px] text-[#5B6579] truncate">{d.shortId}</span>
               <button
                 type="button"
                 className="p-1.5 rounded-full text-[#9CA3AF] hover:bg-[#F3F4F6] hover:text-[#6B7280] shrink-0"
@@ -1070,28 +1451,30 @@ const AgentDetailView = ({ agent, onBack, hosting }: { agent: Agent; onBack: () 
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-1">
-            <button
-              type="button"
-              className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-[14px] font-medium text-white transition-opacity hover:opacity-90"
-              style={{ background: ACCENT }}
-            >
-              <ExternalLink size={14} />
-              Open Agent
-            </button>
-            <button
-              type="button"
-              className="inline-flex items-center h-8 px-3 rounded text-[14px] font-medium border border-[#714DFF] text-[#714DFF] bg-white hover:bg-[#F8F6FF] transition-colors"
-            >
-              View Traces
-            </button>
-            <button
-              type="button"
-              className="inline-flex items-center h-8 px-3 rounded text-[14px] font-medium border border-[#714DFF] text-[#714DFF] bg-white hover:bg-[#F8F6FF] transition-colors"
-            >
-              View Evaluations
-            </button>
-          </div>
+          {builds.some(b => b.status === 'deployed') && (
+            <div className="flex flex-wrap items-center gap-1">
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-[14px] font-medium text-white transition-opacity hover:opacity-90"
+                style={{ background: ACCENT }}
+              >
+                <ExternalLink size={14} />
+                Open Agent
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center h-8 px-3 rounded text-[14px] font-medium border border-[#714DFF] text-[#714DFF] bg-white hover:bg-[#F8F6FF] transition-colors"
+              >
+                View Traces
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center h-8 px-3 rounded text-[14px] font-medium border border-[#714DFF] text-[#714DFF] bg-white hover:bg-[#F8F6FF] transition-colors"
+              >
+                View Evaluations
+              </button>
+            </div>
+          )}
 
           <div className="flex flex-col gap-2 w-full">
             <DetailLabel>Description</DetailLabel>
@@ -1102,24 +1485,13 @@ const AgentDetailView = ({ agent, onBack, hosting }: { agent: Agent; onBack: () 
         <div className="flex flex-col gap-6 w-[622px] shrink-0">
           <div className="flex flex-col gap-2">
             <DetailLabel>Deployment</DetailLabel>
-            <DetailValue>{d.deploymentId}</DetailValue>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <DetailLabel>Domains</DetailLabel>
-            <a
-              href="#"
-              className="text-[14px] text-[#19202F] leading-5 underline-offset-2 hover:underline"
-              onClick={e => e.preventDefault()}
-            >
-              {d.domains}
-            </a>
+            <DetailValue>{builds.find(b => b.status === 'deployed')?.id ?? '—'}</DetailValue>
           </div>
 
           <div className="flex items-start gap-10">
             <div className="flex flex-col gap-2 w-[132px]">
               <DetailLabel>Status</DetailLabel>
-              <div className="pt-0.5"><StatusBadge status={d.status} /></div>
+              <div className="pt-0.5"><HistoryStatusBadge status={computeAgentStatus(builds)} /></div>
             </div>
             <div className="flex flex-col gap-2 w-[132px]">
               <DetailLabel>ACT Type</DetailLabel>
@@ -1133,27 +1505,56 @@ const AgentDetailView = ({ agent, onBack, hosting }: { agent: Agent; onBack: () 
 
           <div className="flex flex-col gap-2">
             <DetailLabel>Source</DetailLabel>
-            <div className="flex flex-col gap-2">
-              {!isScale && (
-                <div className="flex items-center gap-2 text-[14px] text-[#19202F]">
-                  <GitBranch size={14} className="shrink-0 text-[#5B6579]" />
-                  <span>{d.branch}</span>
+            {(() => {
+              const deployedBuild = builds.find(b => b.status === 'deployed');
+              return (
+                <div className="flex flex-col gap-2">
+                  {deployedBuild?.sourceBranch && (
+                    <div className="flex items-center gap-2 text-[14px] text-[#19202F]">
+                      <GitBranch size={14} className="shrink-0 text-[#5B6579]" />
+                      <span>{deployedBuild.sourceBranch}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 text-[14px] text-[#19202F] min-w-0">
+                    {deployedBuild?.commitLine && <GitCommit size={14} className="shrink-0 text-[#5B6579]" />}
+                    <span className="font-mono">{deployedBuild?.commitLine ?? '—'}</span>
+                  </div>
                 </div>
-              )}
-              <div className="flex items-center gap-2 text-[14px] text-[#19202F] min-w-0">
-                <GitCommit size={14} className="shrink-0 text-[#5B6579]" />
-                <span className="truncate">{d.commitMessage}</span>
-              </div>
-            </div>
+              );
+            })()}
           </div>
         </div>
         </div>
 
         <div className="flex flex-col gap-6 w-full">
           <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-[18px] font-semibold text-[#111827]">Build History</h2>
-              {isScale && (
+            {!isScale ? (
+              <>
+                <h2 className="text-[18px] font-semibold text-[#111827]">Build History</h2>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-[14px] text-[#5B6579]">
+                    <RefreshCw size={12} className="shrink-0" />
+                    <span>
+                      Automatically created for pushes to{' '}
+                      <span className="inline-flex items-center gap-1 text-[#19202F]">
+                        <GithubIcon size={14} className="shrink-0" />
+                        {d.repository}
+                      </span>
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAddBuildOpen(true)}
+                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-[14px] font-medium border border-[#714DFF] text-[#714DFF] bg-white hover:bg-[#F8F6FF] transition-colors"
+                  >
+                    <Plus size={14} />
+                    Add Build
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-between">
+                <h2 className="text-[18px] font-semibold text-[#111827]">Build History</h2>
                 <button
                   type="button"
                   onClick={() => setAddBuildOpen(true)}
@@ -1162,27 +1563,15 @@ const AgentDetailView = ({ agent, onBack, hosting }: { agent: Agent; onBack: () 
                   <Plus size={14} />
                   Add Build
                 </button>
-              )}
-            </div>
-            {!isScale && (
-              <div className="flex items-center gap-2 text-[14px] text-[#5B6579]">
-                <RefreshCw size={12} className="shrink-0" />
-                <span>
-                  Automatically created for pushes to{' '}
-                  <span className="inline-flex items-center gap-1 text-[#19202F]">
-                    <GithubIcon size={14} className="shrink-0" />
-                    {d.repository}
-                  </span>
-                </span>
               </div>
             )}
           </div>
 
           <div className="rounded border border-[#D1DAEB] overflow-hidden">
-            {allBuilds.map((row, i) => (
+            {builds.map((row, i) => (
               <div
                 key={row.id}
-                onClick={() => setSelectedBuild(row)}
+                onClick={() => setSelectedBuildId(row.id)}
                 className={cn(
                   'flex items-center justify-between h-[89px] px-6 overflow-hidden cursor-pointer hover:bg-[#FAFBFF] transition-colors',
                   i > 0 && 'border-t border-[rgba(0,50,145,0.18)]',
@@ -1197,30 +1586,27 @@ const AgentDetailView = ({ agent, onBack, hosting }: { agent: Agent; onBack: () 
                   )}
                 </div>
 
-                <div className="w-[116px] shrink-0 flex flex-col gap-2 justify-center items-start">
+                <div className="w-[116px] shrink-0 flex flex-col gap-1.5 items-start">
                   <HistoryStatusBadge status={row.status} />
-                  <span className="text-[12px] text-[#5B6579] leading-4 tracking-[0.04px]">{row.relativeTime}</span>
+                  {row.status === 'building' && row.startedAt ? (
+                    <ElapsedTime startedAt={row.startedAt} />
+                  ) : (
+                    <span className="text-[12px] text-[#5B6579] leading-4 tracking-[0.04px]">{row.relativeTime}</span>
+                  )}
                 </div>
 
                 <div className="w-[165px] shrink-0 flex flex-col gap-1">
-                  {row.redeployLabel ? (
-                    <div className="flex items-center gap-2">
-                      <RotateCcw size={14} className="shrink-0 text-[#818EA9]" />
-                      <span className="text-[14px] text-[#19202F] leading-5 whitespace-nowrap">{row.redeployLabel}</span>
+                  {row.sourceBranch && (
+                    <div className="flex items-center gap-2 text-[14px] text-[#19202F]">
+                      <GitBranch size={14} className="shrink-0 text-[#818EA9]" />
+                      <span className="whitespace-nowrap">{row.sourceBranch}</span>
                     </div>
-                  ) : (
-                    <>
-                      {!isScale && (
-                        <div className="flex items-center gap-2 text-[14px] text-[#19202F]">
-                          <GitBranch size={14} className="shrink-0 text-[#818EA9]" />
-                          <span className="whitespace-nowrap">{row.sourceBranch}</span>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-2 text-[14px] text-[#19202F]">
-                        <GitCommit size={14} className="shrink-0 text-[#818EA9]" />
-                        <span className="whitespace-nowrap">{row.commitLine}</span>
-                      </div>
-                    </>
+                  )}
+                  {row.commitLine && (
+                    <div className="flex items-center gap-2 text-[14px] text-[#19202F]">
+                      <GitCommit size={14} className="shrink-0 text-[#818EA9]" />
+                      <span className="whitespace-nowrap">{row.commitLine}</span>
+                    </div>
                   )}
                 </div>
 
@@ -1228,8 +1614,23 @@ const AgentDetailView = ({ agent, onBack, hosting }: { agent: Agent; onBack: () 
                   {row.authorLine}
                 </div>
 
-                <div onClick={e => e.stopPropagation()}>
-                  <RowActionsMenu row={row} domain={d.domains} />
+                <div className="w-[136px] shrink-0 flex justify-end items-center gap-1" onClick={e => e.stopPropagation()}>
+                  {row.status === 'ready' ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleDeploy(row.id)}
+                        className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-[14px] font-medium text-white transition-opacity hover:opacity-90"
+                        style={{ background: ACCENT }}
+                      >
+                        <FontAwesomeIcon icon={faCircleUp} style={{ width: 13, height: 13 }} />
+                        Deploy
+                      </button>
+                      <RowActionsMenu row={row} domain={d.domains} onDeploy={handleDeploy} onCancel={handleCancel} onRetryBuild={handleRetryBuild} />
+                    </>
+                  ) : (
+                    <RowActionsMenu row={row} domain={d.domains} onDeploy={handleDeploy} onCancel={handleCancel} onRetryBuild={handleRetryBuild} />
+                  )}
                 </div>
               </div>
             ))}
@@ -1240,7 +1641,17 @@ const AgentDetailView = ({ agent, onBack, hosting }: { agent: Agent; onBack: () 
         open={addBuildOpen}
         onClose={() => setAddBuildOpen(false)}
         onConfirm={handleAddBuild}
+        suggestedVersion={suggestNextVersion(builds)}
       />
+      {deployPending && (
+        <DeployConfirmModal
+          open={!!deployPending}
+          buildId={deployPending.buildId}
+          isFirstDeploy={deployPending.isFirstDeploy}
+          onClose={() => setDeployPending(null)}
+          onConfirm={() => executeDeploy(deployPending.buildId)}
+        />
+      )}
     </div>
   );
 };
@@ -1277,10 +1688,7 @@ const AgentexCICD: React.FC = () => {
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [agents, setAgents] = useState<Agent[]>(AGENTS);
   const [createAgentOpen, setCreateAgentOpen] = useState(false);
-  const { params } = useTweakpane(
-    { hosting: 'github' },
-    { hosting: { options: { 'Github Hosted': 'github', 'Scale Hosted': 'scale' } } },
-  );
+  const [agentStatusOverrides, setAgentStatusOverrides] = useState<Record<string, HistoryRowStatus>>({});
 
   const handleCreateAgent = (name: string, version: string) => {
     const now = new Date();
@@ -1290,7 +1698,7 @@ const AgentexCICD: React.FC = () => {
       hosting: 'scale',
       initialVersion: version,
       name,
-      status: 'draft',
+      status: 'building',
       description: 'An agentex agent that is designed to do something special with your inputs.',
       lastModified: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
     };
@@ -1308,7 +1716,12 @@ const AgentexCICD: React.FC = () => {
 
           <main className="flex-1 w-full px-6 pb-6 pt-[18px] flex flex-col gap-4">
             {selectedAgent ? (
-              <AgentDetailView agent={selectedAgent} onBack={() => setSelectedAgent(null)} hosting={selectedAgent.hosting ?? params.hosting} />
+              <AgentDetailView
+                agent={selectedAgent}
+                onBack={() => setSelectedAgent(null)}
+                hosting={selectedAgent.hosting ?? 'github'}
+                onStatusChange={status => setAgentStatusOverrides(prev => ({ ...prev, [selectedAgent.id]: status }))}
+              />
             ) : (
               <>
                 <div className="flex items-center justify-between">
@@ -1325,13 +1738,13 @@ const AgentexCICD: React.FC = () => {
 
                 <div className="flex items-center justify-between">
                   <ViewToggle view={view} setView={setView} />
-                  <div className="flex items-center gap-1">
-                    <button className="w-8 h-8 flex items-center justify-center rounded-md text-[#9CA3AF] hover:bg-[#F3F4F6] hover:text-[#6B7280] transition-colors">
-                      <Search size={15} />
-                    </button>
-                    <button className="w-8 h-8 flex items-center justify-center rounded-md text-[#9CA3AF] hover:bg-[#F3F4F6] hover:text-[#6B7280] transition-colors">
-                      <SlidersHorizontal size={15} />
-                    </button>
+                  <div className="relative w-[250px]">
+                    <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF] pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Search agents..."
+                      className="w-full pl-8 pr-3 py-1.5 text-[13px] rounded-md border border-[#E5E7EB] bg-white text-[#374151] placeholder-[#9CA3AF] outline-none focus:border-[#6B7280] transition-colors"
+                    />
                   </div>
                 </div>
 
@@ -1342,7 +1755,7 @@ const AgentexCICD: React.FC = () => {
                   )}
                 >
                   {agents.map(agent => (
-                    <AgentCard key={agent.id} agent={agent} onSelect={setSelectedAgent} />
+                    <AgentCard key={agent.id} agent={agent} overrideStatus={agentStatusOverrides[agent.id]} onSelect={setSelectedAgent} />
                   ))}
                 </div>
               </>
