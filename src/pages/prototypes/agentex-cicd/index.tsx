@@ -17,6 +17,7 @@ import {
   Loader2,
   LayoutGrid,
   List,
+  Table,
   MoreHorizontal,
   Plus,
 
@@ -66,7 +67,7 @@ type HistoryRowStatus = 'building' | 'ready' | 'deployed' | 'inactive' | 'cancel
 const HISTORY_STATUS: Record<HistoryRowStatus, { label: string; bg: string; text: string; dot?: string }> = {
   building:  { label: 'Building',  bg: 'bg-[#FEF3C7]', text: 'text-[#92400E]', dot: 'bg-[#F59E0B]' },
   ready:     { label: 'Ready',     bg: 'bg-[#F3F4F6]', text: 'text-[#6B7280]', dot: 'bg-[#9CA3AF]' },
-  deployed:  { label: 'Deployed',  bg: 'bg-[#DCFCE7]', text: 'text-[#15803D]', dot: 'bg-[#22C55E]' },
+  deployed:  { label: 'Deployed',  bg: 'bg-[rgba(0,151,0,0.0863)]', text: 'text-[#2A7E3B]', dot: 'bg-[#46A758]' },
   inactive:  { label: 'Inactive',  bg: 'bg-[#F3F4F6]', text: 'text-[#6B7280]', dot: 'bg-[#9CA3AF]' },
   cancelled: { label: 'Cancelled', bg: 'bg-[#F3F4F6]', text: 'text-[#6B7280]', dot: 'bg-[#9CA3AF]' },
   error:     { label: 'Error',     bg: 'bg-[#FEE2E2]', text: 'text-[#B91C1C]', dot: 'bg-[#EF4444]' },
@@ -1586,25 +1587,18 @@ const AgentDetailView = ({ agent, onBack, hosting, onStatusChange }: { agent: Ag
 // ─── View Toggle ──────────────────────────────────────────────────────────────
 
 const ViewToggle = ({ view, setView }: { view: 'grid' | 'list'; setView: (v: 'grid' | 'list') => void }) => (
-  <div className="flex items-center border border-[#E5E7EB] rounded-md overflow-hidden">
+  <div className="flex items-center gap-0.5 bg-[#EAECF0] rounded-lg p-px">
     <button
       onClick={() => setView('grid')}
-      className={cn(
-        'flex items-center justify-center w-8 h-7 transition-colors',
-        view === 'grid' ? 'bg-[#F3F4F6] text-[#111827]' : 'bg-white text-[#9CA3AF] hover:text-[#6B7280]',
-      )}
+      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] font-medium transition-all bg-white text-[#5746AF] shadow-sm shadow-black/10"
     >
       <LayoutGrid size={14} />
+      Grid
     </button>
-    <button
-      onClick={() => setView('list')}
-      className={cn(
-        'flex items-center justify-center w-8 h-7 border-l border-[#E5E7EB] transition-colors',
-        view === 'list' ? 'bg-[#F3F4F6] text-[#111827]' : 'bg-white text-[#9CA3AF] hover:text-[#6B7280]',
-      )}
-    >
-      <List size={14} />
-    </button>
+    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] font-medium text-[#6B7280]">
+      <Table size={14} />
+      Table
+    </div>
   </div>
 );
 

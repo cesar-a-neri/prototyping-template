@@ -347,16 +347,21 @@ const InputBox: React.FC<InputBoxProps> = ({
                                         isRequired
                                     />
                                     {selectedSource && (
-                                        <InlineSelector
-                                            label="Database"
-                                            value={selectedDatabase?.label ?? null}
-                                            placeholder="Optional..."
-                                            locked={contextLocked}
-                                            innerKey="database"
-                                            items={availableDatabases}
-                                            onSelect={db => { onDatabaseChange(db); }}
-                                            onClear={() => { onDatabaseChange(null); onSchemaChange(null); setOpenInner(null); }}
-                                        />
+                                        <>
+                                            <p className="text-[11px] leading-[1.5]" style={{ color: '#a0aec0' }}>
+                                                Scope the agent to tables within a specific database and schema.
+                                            </p>
+                                            <InlineSelector
+                                                label="Database"
+                                                value={selectedDatabase?.label ?? null}
+                                                placeholder="Optional..."
+                                                locked={contextLocked}
+                                                innerKey="database"
+                                                items={availableDatabases}
+                                                onSelect={db => { onDatabaseChange(db); }}
+                                                onClear={() => { onDatabaseChange(null); onSchemaChange(null); setOpenInner(null); }}
+                                            />
+                                        </>
                                     )}
                                     {selectedDatabase && (
                                         <InlineSelector
