@@ -322,11 +322,6 @@ const ModalOverlay = () => (
   <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
 );
 
-const ModalContent = ({ children }: { children: React.ReactNode }) => (
-  <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 w-[480px] -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-[0px_12px_32px_-16px_rgba(0,0,0,0.3),0px_12px_60px_0px_rgba(0,0,0,0.15)] flex flex-col gap-4 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
-    {children}
-  </DialogPrimitive.Content>
-);
 
 const ModalHeader = ({ title, onClose }: { title: string; onClose: () => void }) => (
   <div className="flex items-start justify-between gap-2">
@@ -768,12 +763,14 @@ const DeployConfirmModal = ({
   open,
   buildId,
   isFirstDeploy,
+  isRedeployingSelf = false,
   onClose,
   onConfirm,
 }: {
   open: boolean;
   buildId: string;
   isFirstDeploy: boolean;
+  isRedeployingSelf?: boolean;
   onClose: () => void;
   onConfirm: () => void;
 }) => {
@@ -792,78 +789,76 @@ const DeployConfirmModal = ({
   }, [open]);
 
   const handleConfirm = () => { onConfirm(); onClose(); };
-  const Wrapper = isFirstDeploy ? MediumModalContent : ModalContent;
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={v => !v && onClose()}>
       <DialogPrimitive.Portal>
         <ModalOverlay />
-        <Wrapper>
+        <MediumModalContent>
           <ModalHeader
             title={isFirstDeploy ? 'Deploy Build' : 'Redeploy Build'}
             onClose={onClose}
           />
 
-          {isFirstDeploy ? (
-            <div className="flex flex-col gap-3">
-              <p className="text-[14px] text-[#5B6579] leading-5">
-                Optionally review and update your configuration before deploying.
-              </p>
+          <div className="flex flex-col gap-3">
+            <p className="text-[14px] text-[#5B6579] leading-5">
+              {isFirstDeploy
+                ? 'Optionally review and update your configuration before deploying.'
+                : isRedeployingSelf
+                  ? <>Optionally update your configuration before redeploying <strong className="text-[#19202F] font-medium">{buildId}</strong>.</>
+                  : <>Optionally update your configuration before redeploying <strong className="text-[#19202F] font-medium">{buildId}</strong>. The current deployment will be moved to Inactive.</>
+              }
+            </p>
 
-              <div className="border border-[#D1DAEB] rounded-lg overflow-hidden">
-                {/* Manifest file */}
+            <div className="border border-[#D1DAEB] rounded-lg overflow-hidden">
+              {/* Manifest file */}
+              <button
+                type="button"
+                onClick={() => setManifestOpen(v => !v)}
+                className="w-full flex items-center justify-between px-4 py-3 hover:bg-[#FAFBFF] transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0"><path d="M4 1.5C3.71875 1.5 3.5 1.71875 3.5 2V14C3.5 14.2812 3.71875 14.5 4 14.5H12C12.2812 14.5 12.5 14.2812 12.5 14V6.5H9.75C8.5 6.5 7.5 5.5 7.5 4.25V1.5H4ZM9 2.125V4.25C9 4.65625 9.34375 5 9.75 5H11.875L9 2.125ZM4 0H8.1875C8.71875 0 9.21875 0.21875 9.59375 0.59375L13.4062 4.40625C13.7812 4.78125 14 5.3125 14 5.84375V14C14 15.0938 13.0938 16 12 16H4C2.90625 16 2 15.0938 2 14V2C2 0.90625 2.90625 0 4 0ZM7.3125 9.25L6.25 10.5L7.3125 11.75C7.59375 12.0625 7.5625 12.5625 7.25 12.8125C6.9375 13.0938 6.4375 13.0625 6.1875 12.75L4.6875 11C4.4375 10.7188 4.4375 10.2812 4.6875 10L6.1875 8.25C6.4375 7.9375 6.9375 7.90625 7.25 8.1875C7.5625 8.4375 7.59375 8.9375 7.3125 9.25ZM9.8125 8.25L11.3125 10C11.5625 10.2812 11.5625 10.7188 11.3125 11L9.8125 12.75C9.5625 13.0625 9.09375 13.0938 8.75 12.8125C8.4375 12.5625 8.40625 12.0938 8.6875 11.75L9.75 10.5L8.6875 9.25C8.40625 8.9375 8.4375 8.4375 8.75 8.1875C9.0625 7.90625 9.5625 7.9375 9.8125 8.25Z" fill="#AFBCD8"/></svg>
+                  <span className="text-[12px] font-medium text-[#19202F]">Manifest File</span>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <span className="text-[12px] text-[#818EA9]">Last edited Jan 15, 2025</span>
+                  <ChevronDown size={14} className={cn('text-[#818EA9] transition-transform duration-150 shrink-0', manifestOpen && 'rotate-180')} />
+                </div>
+              </button>
+              {manifestOpen && (
+                <div className="border-t border-[#D1DAEB] overflow-hidden">
+                  <YamlEditor value={manifest} onChange={setManifest} />
+                </div>
+              )}
+
+              {/* Environment variables */}
+              <div className="border-t border-[#D1DAEB]">
                 <button
                   type="button"
-                  onClick={() => setManifestOpen(v => !v)}
+                  onClick={() => setEnvOpen(v => !v)}
                   className="w-full flex items-center justify-between px-4 py-3 hover:bg-[#FAFBFF] transition-colors"
                 >
                   <div className="flex items-center gap-2">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0"><path d="M4 1.5C3.71875 1.5 3.5 1.71875 3.5 2V14C3.5 14.2812 3.71875 14.5 4 14.5H12C12.2812 14.5 12.5 14.2812 12.5 14V6.5H9.75C8.5 6.5 7.5 5.5 7.5 4.25V1.5H4ZM9 2.125V4.25C9 4.65625 9.34375 5 9.75 5H11.875L9 2.125ZM4 0H8.1875C8.71875 0 9.21875 0.21875 9.59375 0.59375L13.4062 4.40625C13.7812 4.78125 14 5.3125 14 5.84375V14C14 15.0938 13.0938 16 12 16H4C2.90625 16 2 15.0938 2 14V2C2 0.90625 2.90625 0 4 0ZM7.3125 9.25L6.25 10.5L7.3125 11.75C7.59375 12.0625 7.5625 12.5625 7.25 12.8125C6.9375 13.0938 6.4375 13.0625 6.1875 12.75L4.6875 11C4.4375 10.7188 4.4375 10.2812 4.6875 10L6.1875 8.25C6.4375 7.9375 6.9375 7.90625 7.25 8.1875C7.5625 8.4375 7.59375 8.9375 7.3125 9.25ZM9.8125 8.25L11.3125 10C11.5625 10.2812 11.5625 10.7188 11.3125 11L9.8125 12.75C9.5625 13.0625 9.09375 13.0938 8.75 12.8125C8.4375 12.5625 8.40625 12.0938 8.6875 11.75L9.75 10.5L8.6875 9.25C8.40625 8.9375 8.4375 8.4375 8.75 8.1875C9.0625 7.90625 9.5625 7.9375 9.8125 8.25Z" fill="#AFBCD8"/></svg>
-                    <span className="text-[12px] font-medium text-[#19202F]">Manifest File</span>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0"><path d="M0.75 2.25H3.625C3.9375 1.25 4.875 0.5 6 0.5C7.125 0.5 8.0625 1.25 8.375 2.25H15.25C15.6562 2.25 16 2.59375 16 3C16 3.40625 15.6562 3.75 15.25 3.75H8.375C8.0625 4.78125 7.125 5.5 6 5.5C4.875 5.5 3.9375 4.78125 3.625 3.75H0.75C0.34375 3.75 0 3.40625 0 3C0 2.59375 0.34375 2.25 0.75 2.25ZM0.75 7.25H8.625C8.9375 6.25 9.875 5.5 11 5.5C12.125 5.5 13.0625 6.25 13.375 7.25H15.25C15.6562 7.25 16 7.59375 16 8C16 8.40625 15.6562 8.75 15.25 8.75H13.375C13.0625 9.78125 12.125 10.5 11 10.5C9.875 10.5 8.9375 9.78125 8.625 8.75H0.75C0.34375 8.75 0 8.40625 0 8C0 7.59375 0.34375 7.25 0.75 7.25ZM0.75 12.25H2.625C2.9375 11.25 3.875 10.5 5 10.5C6.125 10.5 7.0625 11.25 7.375 12.25H15.25C15.6562 12.25 16 12.5938 16 13C16 13.4062 15.6562 13.75 15.25 13.75H7.375C7.0625 14.7812 6.125 15.5 5 15.5C3.875 15.5 2.9375 14.7812 2.625 13.75H0.75C0.34375 13.75 0 13.4062 0 13C0 12.5938 0.34375 12.25 0.75 12.25ZM5 14C5.5625 14 6 13.5625 6 13C6 12.4375 5.5625 12 5 12C4.4375 12 4 12.4375 4 13C4 13.5625 4.4375 14 5 14ZM11 9C11.5625 9 12 8.5625 12 8C12 7.4375 11.5625 7 11 7C10.4375 7 10 7.4375 10 8C10 8.5625 10.4375 9 11 9ZM5 3C5 3.5625 5.4375 4 6 4C6.5625 4 7 3.5625 7 3C7 2.4375 6.5625 2 6 2C5.4375 2 5 2.4375 5 3Z" fill="#AFBCD8"/></svg>
+                    <span className="text-[12px] font-medium text-[#19202F]">Environment Variables</span>
                   </div>
                   <div className="flex items-center gap-2.5">
-                    <span className="text-[12px] text-[#818EA9]">Last edited Jan 15, 2025</span>
-                    <ChevronDown size={14} className={cn('text-[#818EA9] transition-transform duration-150 shrink-0', manifestOpen && 'rotate-180')} />
+                    <span className="text-[12px] text-[#818EA9]">Last edited Jan 10, 2025</span>
+                    <ChevronDown size={14} className={cn('text-[#818EA9] transition-transform duration-150 shrink-0', envOpen && 'rotate-180')} />
                   </div>
                 </button>
-                {manifestOpen && (
+                {envOpen && (
                   <div className="border-t border-[#D1DAEB] overflow-hidden">
-                    <YamlEditor value={manifest} onChange={setManifest} />
+                    <YamlEditor value={envYaml} onChange={setEnvYaml} />
                   </div>
                 )}
-
-                {/* Environment variables */}
-                <div className="border-t border-[#D1DAEB]">
-                  <button
-                    type="button"
-                    onClick={() => setEnvOpen(v => !v)}
-                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-[#FAFBFF] transition-colors"
-                  >
-                      <div className="flex items-center gap-2">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0"><path d="M0.75 2.25H3.625C3.9375 1.25 4.875 0.5 6 0.5C7.125 0.5 8.0625 1.25 8.375 2.25H15.25C15.6562 2.25 16 2.59375 16 3C16 3.40625 15.6562 3.75 15.25 3.75H8.375C8.0625 4.78125 7.125 5.5 6 5.5C4.875 5.5 3.9375 4.78125 3.625 3.75H0.75C0.34375 3.75 0 3.40625 0 3C0 2.59375 0.34375 2.25 0.75 2.25ZM0.75 7.25H8.625C8.9375 6.25 9.875 5.5 11 5.5C12.125 5.5 13.0625 6.25 13.375 7.25H15.25C15.6562 7.25 16 7.59375 16 8C16 8.40625 15.6562 8.75 15.25 8.75H13.375C13.0625 9.78125 12.125 10.5 11 10.5C9.875 10.5 8.9375 9.78125 8.625 8.75H0.75C0.34375 8.75 0 8.40625 0 8C0 7.59375 0.34375 7.25 0.75 7.25ZM0.75 12.25H2.625C2.9375 11.25 3.875 10.5 5 10.5C6.125 10.5 7.0625 11.25 7.375 12.25H15.25C15.6562 12.25 16 12.5938 16 13C16 13.4062 15.6562 13.75 15.25 13.75H7.375C7.0625 14.7812 6.125 15.5 5 15.5C3.875 15.5 2.9375 14.7812 2.625 13.75H0.75C0.34375 13.75 0 13.4062 0 13C0 12.5938 0.34375 12.25 0.75 12.25ZM5 14C5.5625 14 6 13.5625 6 13C6 12.4375 5.5625 12 5 12C4.4375 12 4 12.4375 4 13C4 13.5625 4.4375 14 5 14ZM11 9C11.5625 9 12 8.5625 12 8C12 7.4375 11.5625 7 11 7C10.4375 7 10 7.4375 10 8C10 8.5625 10.4375 9 11 9ZM5 3C5 3.5625 5.4375 4 6 4C6.5625 4 7 3.5625 7 3C7 2.4375 6.5625 2 6 2C5.4375 2 5 2.4375 5 3Z" fill="#AFBCD8"/></svg>
-                        <span className="text-[12px] font-medium text-[#19202F]">Environment Variables</span>
-                      </div>
-                      <div className="flex items-center gap-2.5">
-                        <span className="text-[12px] text-[#818EA9]">Last edited Jan 10, 2025</span>
-                        <ChevronDown size={14} className={cn('text-[#818EA9] transition-transform duration-150 shrink-0', envOpen && 'rotate-180')} />
-                      </div>
-                  </button>
-                  {envOpen && (
-                    <div className="border-t border-[#D1DAEB] overflow-hidden">
-                      <YamlEditor value={envYaml} onChange={setEnvYaml} />
-                    </div>
-                  )}
-                </div>
               </div>
             </div>
-          ) : (
-            <p className="text-[14px] text-[#5B6579] leading-5">
-              This will make <strong className="text-[#19202F] font-medium">{buildId}</strong> the active build. The current deployment will be moved to Inactive.
-            </p>
-          )}
+          </div>
 
           <ModalFooter onCancel={onClose} onConfirm={handleConfirm} confirmLabel="Deploy" />
-        </Wrapper>
+        </MediumModalContent>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
   );
@@ -900,12 +895,21 @@ const RowActionsMenu = ({ row, domain: _domain, onDeploy, onCancel, onRetryBuild
             {/* Group 1: primary actions (status-dependent) */}
             <DropdownMenuPrimitive.Group>
               {row.status === 'deployed' && (
-                <DropdownMenuPrimitive.Item
-                  className="flex items-center gap-1 px-1 py-1.5 rounded text-[14px] text-[#19202F] cursor-default select-none outline-none hover:bg-[#F3F4F6] focus:bg-[#F3F4F6]"
-                >
-                  <span className="flex-1">Open</span>
-                  <ExternalLink size={14} className="shrink-0 text-[#AFBCD8]" />
-                </DropdownMenuPrimitive.Item>
+                <>
+                  <DropdownMenuPrimitive.Item
+                    className="flex items-center gap-1 px-1 py-1.5 rounded text-[14px] text-[#19202F] cursor-default select-none outline-none hover:bg-[#F3F4F6] focus:bg-[#F3F4F6]"
+                  >
+                    <span className="flex-1">Open</span>
+                    <ExternalLink size={14} className="shrink-0 text-[#AFBCD8]" />
+                  </DropdownMenuPrimitive.Item>
+                  <DropdownMenuPrimitive.Item
+                    onSelect={() => onDeploy?.(row.id)}
+                    className="flex items-center gap-1 px-1 py-1.5 rounded text-[14px] text-[#19202F] cursor-default select-none outline-none hover:bg-[#F3F4F6] focus:bg-[#F3F4F6]"
+                  >
+                    <span className="flex-1">Redeploy</span>
+                    <FontAwesomeIcon icon={faCircleUp} className="shrink-0 text-[#AFBCD8]" style={{ width: 14, height: 14 }} />
+                  </DropdownMenuPrimitive.Item>
+                </>
               )}
               {(row.status === 'inactive' || (row.status === 'cancelled' && row.buildPhase === 'deploy')) && (
                 <DropdownMenuPrimitive.Item
@@ -1296,12 +1300,12 @@ const AgentDetailView = ({ agent, onBack, hosting, onStatusChange }: { agent: Ag
     }, ...prev]);
   };
 
-  const [deployPending, setDeployPending] = useState<{ buildId: string; isFirstDeploy: boolean } | null>(null);
+  const [deployPending, setDeployPending] = useState<{ buildId: string; isFirstDeploy: boolean; isRedeployingSelf: boolean } | null>(null);
 
   const handleDeploy = (buildId: string) => {
     const build = builds.find(b => b.id === buildId);
     if (!build) return;
-    setDeployPending({ buildId, isFirstDeploy: build.status === 'ready' });
+    setDeployPending({ buildId, isFirstDeploy: build.status === 'ready', isRedeployingSelf: build.status === 'deployed' });
   };
 
   const executeDeploy = (buildId: string) => {
@@ -1575,6 +1579,7 @@ const AgentDetailView = ({ agent, onBack, hosting, onStatusChange }: { agent: Ag
           open={!!deployPending}
           buildId={deployPending.buildId}
           isFirstDeploy={deployPending.isFirstDeploy}
+          isRedeployingSelf={deployPending.isRedeployingSelf}
           onClose={() => setDeployPending(null)}
           onConfirm={() => executeDeploy(deployPending.buildId)}
         />
