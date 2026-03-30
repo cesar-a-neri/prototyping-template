@@ -16,7 +16,6 @@ import {
   History,
   Loader2,
   LayoutGrid,
-  List,
   Table,
   MoreHorizontal,
   Plus,
@@ -1586,7 +1585,7 @@ const AgentDetailView = ({ agent, onBack, hosting, onStatusChange }: { agent: Ag
 
 // ─── View Toggle ──────────────────────────────────────────────────────────────
 
-const ViewToggle = ({ view, setView }: { view: 'grid' | 'list'; setView: (v: 'grid' | 'list') => void }) => (
+const ViewToggle = ({ setView }: { view: 'grid' | 'list'; setView: (v: 'grid' | 'list') => void }) => (
   <div className="flex items-center gap-0.5 bg-[#EAECF0] rounded-lg p-px">
     <button
       onClick={() => setView('grid')}
