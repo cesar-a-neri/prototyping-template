@@ -319,7 +319,7 @@ const DetailLabel = ({ children }: { children: React.ReactNode }) => (
 // ─── Shared dialog primitives ─────────────────────────────────────────────────
 
 const ModalOverlay = () => (
-  <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+  <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40" />
 );
 
 
@@ -507,13 +507,13 @@ const BuildUploaderBody: React.FC = () => {
 };
 
 const WideModalContent = ({ children }: { children: React.ReactNode }) => (
-  <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 w-[840px] max-w-[calc(100vw-48px)] -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-[0px_12px_32px_-16px_rgba(0,0,0,0.3),0px_12px_60px_0px_rgba(0,0,0,0.15)] flex flex-col gap-5 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 outline-none">
+  <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 w-[840px] max-w-[calc(100vw-48px)] -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-[0px_12px_32px_-16px_rgba(0,0,0,0.3),0px_12px_60px_0px_rgba(0,0,0,0.15)] flex flex-col gap-5 outline-none">
     {children}
   </DialogPrimitive.Content>
 );
 
 const MediumModalContent = ({ children }: { children: React.ReactNode }) => (
-  <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 w-[640px] max-w-[calc(100vw-48px)] -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-[0px_12px_32px_-16px_rgba(0,0,0,0.3),0px_12px_60px_0px_rgba(0,0,0,0.15)] flex flex-col gap-5 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 outline-none">
+  <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 w-[640px] max-w-[calc(100vw-48px)] -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-[0px_12px_32px_-16px_rgba(0,0,0,0.3),0px_12px_60px_0px_rgba(0,0,0,0.15)] flex flex-col gap-5 outline-none">
     {children}
   </DialogPrimitive.Content>
 );
@@ -903,7 +903,7 @@ const RowActionsMenu = ({ row, domain: _domain, onDeploy, onCancel, onRetryBuild
                     <ExternalLink size={14} className="shrink-0 text-[#AFBCD8]" />
                   </DropdownMenuPrimitive.Item>
                   <DropdownMenuPrimitive.Item
-                    onSelect={() => onDeploy?.(row.id)}
+                    onSelect={() => setTimeout(() => onDeploy?.(row.id), 0)}
                     className="flex items-center gap-1 px-1 py-1.5 rounded text-[14px] text-[#19202F] cursor-default select-none outline-none hover:bg-[#F3F4F6] focus:bg-[#F3F4F6]"
                   >
                     <span className="flex-1">Redeploy</span>
@@ -913,7 +913,7 @@ const RowActionsMenu = ({ row, domain: _domain, onDeploy, onCancel, onRetryBuild
               )}
               {(row.status === 'inactive' || (row.status === 'cancelled' && row.buildPhase === 'deploy')) && (
                 <DropdownMenuPrimitive.Item
-                  onSelect={() => onDeploy?.(row.id)}
+                  onSelect={() => setTimeout(() => onDeploy?.(row.id), 0)}
                   className="flex items-center gap-1 px-1 py-1.5 rounded text-[14px] text-[#19202F] cursor-default select-none outline-none hover:bg-[#F3F4F6] focus:bg-[#F3F4F6]"
                 >
                   <span className="flex-1">Deploy</span>
@@ -1574,16 +1574,14 @@ const AgentDetailView = ({ agent, onBack, hosting, onStatusChange }: { agent: Ag
         onConfirm={handleAddBuild}
         suggestedVersion={suggestNextVersion(builds)}
       />
-      {deployPending && (
-        <DeployConfirmModal
-          open={!!deployPending}
-          buildId={deployPending.buildId}
-          isFirstDeploy={deployPending.isFirstDeploy}
-          isRedeployingSelf={deployPending.isRedeployingSelf}
-          onClose={() => setDeployPending(null)}
-          onConfirm={() => executeDeploy(deployPending.buildId)}
-        />
-      )}
+      <DeployConfirmModal
+        open={!!deployPending}
+        buildId={deployPending?.buildId ?? ''}
+        isFirstDeploy={deployPending?.isFirstDeploy ?? false}
+        isRedeployingSelf={deployPending?.isRedeployingSelf ?? false}
+        onClose={() => setDeployPending(null)}
+        onConfirm={() => deployPending && executeDeploy(deployPending.buildId)}
+      />
     </div>
   );
 };
