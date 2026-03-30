@@ -576,7 +576,7 @@ const CreateAgentDialog = ({
             </FormField>
           </div>
           <BuildUploaderBody />
-          <ModalFooter onCancel={onClose} onConfirm={handleConfirm} confirmLabel="Create & Deploy" />
+          <ModalFooter onCancel={onClose} onConfirm={handleConfirm} confirmLabel="Create Agent" />
         </WideModalContent>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
