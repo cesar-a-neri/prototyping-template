@@ -21,16 +21,10 @@ export function ThemeProvider({
     storageKey = 'theme-mode'
 }: ThemeProviderProps) {
     const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
-        // Try to get theme from localStorage first
         if (typeof window !== 'undefined') {
             const stored = localStorage.getItem(storageKey);
             if (stored === 'light' || stored === 'dark') {
                 return stored;
-            }
-
-            // Check system preference
-            if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                return 'dark';
             }
         }
         return defaultTheme;
@@ -64,23 +58,6 @@ export function ThemeProvider({
             root.style.setProperty(property, value);
         });
     }, [themeMode]);
-
-    // Listen for system theme changes
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
-
-        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-        const handleChange = (e: MediaQueryListEvent) => {
-            // Only auto-switch if no manual preference is stored
-            const stored = localStorage.getItem(storageKey);
-            if (!stored) {
-                setThemeMode(e.matches ? 'dark' : 'light');
-            }
-        };
-
-        mediaQuery.addEventListener('change', handleChange);
-        return () => mediaQuery.removeEventListener('change', handleChange);
-    }, [storageKey]);
 
     const value: ThemeContextType = {
         theme,
