@@ -1,18 +1,29 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect } from 'react';
 import { loadEvaluationMetadata, loadEvaluationGroupsFromLocalStorage, saveEvaluationGroups, type EvaluationMetadata, type EvaluationGroup } from '@/utils/csvLoader';
-import { useTheme } from '@/lib/theme';
+import { combinedCSSVariables } from '@/lib/theme';
 import { Navigation } from './Navigation';
 import { SidePanel } from './SidePanel';
 import { RightPanelContent } from './RightPanelContent';
 
-const CompareEvals: React.FC = () => {
-    const { setTheme, theme } = useTheme();
-    const previousTheme = useRef(theme.mode);
+const FORCE_LIGHT_STYLE_ID = 'force-light-mode';
+let lightStyleSheet: string | null = null;
+function getLightStyleSheet() {
+    if (!lightStyleSheet) {
+        const vars = Object.entries(combinedCSSVariables.light)
+            .map(([prop, value]) => `${prop}:${value} !important`)
+            .join(';');
+        lightStyleSheet = `:root{color-scheme:light !important;${vars}}`;
+    }
+    return lightStyleSheet;
+}
 
-    useEffect(() => {
-        previousTheme.current = theme.mode;
-        setTheme('light');
-        return () => { setTheme(previousTheme.current); };
+const CompareEvals: React.FC = () => {
+    useLayoutEffect(() => {
+        const style = document.createElement('style');
+        style.id = FORCE_LIGHT_STYLE_ID;
+        style.textContent = getLightStyleSheet();
+        document.head.appendChild(style);
+        return () => { style.remove(); };
     }, []);
     const [selectedEvaluation, setSelectedEvaluation] = useState('Evaluation name');
     const [evaluations, setEvaluations] = useState<EvaluationMetadata[]>([]);
