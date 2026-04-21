@@ -1,10 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { loadEvaluationMetadata, loadEvaluationGroupsFromLocalStorage, saveEvaluationGroups, type EvaluationMetadata, type EvaluationGroup } from '@/utils/csvLoader';
+import { useTheme } from '@/lib/theme';
 import { Navigation } from './Navigation';
 import { SidePanel } from './SidePanel';
 import { RightPanelContent } from './RightPanelContent';
 
 const CompareEvals: React.FC = () => {
+    const { setTheme, theme } = useTheme();
+    const previousTheme = useRef(theme.mode);
+
+    useEffect(() => {
+        previousTheme.current = theme.mode;
+        setTheme('light');
+        return () => { setTheme(previousTheme.current); };
+    }, []);
     const [selectedEvaluation, setSelectedEvaluation] = useState('Evaluation name');
     const [evaluations, setEvaluations] = useState<EvaluationMetadata[]>([]);
     const [loading, setLoading] = useState(true);
