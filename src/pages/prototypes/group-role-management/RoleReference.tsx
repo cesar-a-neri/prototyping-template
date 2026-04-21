@@ -303,7 +303,7 @@ export const RoleReference: React.FC = () => {
                 'data-[state=inactive]:text-gray-9 data-[state=inactive]:hover:text-gray-11',
               )}
             >
-              By Role
+              Permissions by Role
             </Tabs.Trigger>
             <Tabs.Trigger
               value="by-resource"
@@ -313,7 +313,7 @@ export const RoleReference: React.FC = () => {
                 'data-[state=inactive]:text-gray-9 data-[state=inactive]:hover:text-gray-11',
               )}
             >
-              By Resource
+              Permissions by Resource
             </Tabs.Trigger>
           </Tabs.List>
         </Tabs.Root>

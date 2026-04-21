@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Globe, ArrowUpDown, Users, Plus } from 'lucide-react';
+import { Search, Globe, ArrowUpDown, Users, Plus, Mail } from 'lucide-react';
 import * as ScrollArea from '@radix-ui/react-scroll-area';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import * as Popover from '@radix-ui/react-popover';
@@ -253,17 +253,29 @@ export const UsersManagement: React.FC<UsersManagementProps> = ({ onNavigateToGr
                       <tr key={user.id} className="border-b border-gray-3 last:border-b-0 hover:bg-gray-2 transition-colors">
                         <td className="py-2.5 pr-3">
                           <div className="flex items-center gap-3">
-                            <UserAvatar user={user} />
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <p className="text-[13px] font-medium text-gray-12 truncate">{user.name}</p>
-                                {user.type === 'service-account' && (
-                                  <span className="text-[10px] font-medium text-gray-10 bg-gray-3 px-1.5 py-0.5 rounded shrink-0">
-                                    Service
-                                  </span>
-                                )}
+                            {user.status === 'pending' ? (
+                              <div className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-medium shrink-0 bg-white border border-gray-6 text-gray-8">
+                                <Mail size={14} />
                               </div>
-                              <p className="text-[11px] text-gray-9 truncate">{user.email}</p>
+                            ) : (
+                              <UserAvatar user={user} />
+                            )}
+                            <div className="min-w-0">
+                              {user.status === 'pending' ? (
+                                <p className="text-[13px] text-gray-12 truncate">{user.email}</p>
+                              ) : (
+                                <>
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-[13px] font-medium text-gray-12 truncate">{user.name}</p>
+                                    {user.type === 'service-account' && (
+                                      <span className="text-[10px] font-medium text-gray-10 bg-gray-3 px-1.5 py-0.5 rounded shrink-0">
+                                        Service
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[11px] text-gray-9 truncate">{user.email}</p>
+                                </>
+                              )}
                             </div>
                           </div>
                         </td>

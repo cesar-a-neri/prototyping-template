@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   UserPlus, UserMinus, ShieldCheck, Pencil, MoreHorizontal, Trash2,
   Search, Brain, Cpu, Plug, LayoutDashboard, Wrench,
-  ChevronDown, X, Check, Upload, FileText, Mail, ArrowLeft,
+  ChevronDown, X, Check, Upload, FileText, Mail, ArrowLeft, Filter,
 } from 'lucide-react';
 import { HexagonNodes, WorkflowIcon, EvaluationsIcon } from '../sgp-nav/SgpNav';
 import * as Tabs from '@radix-ui/react-tabs';
@@ -10,6 +10,7 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as ScrollArea from '@radix-ui/react-scroll-area';
+import * as Popover from '@radix-ui/react-popover';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { cn } from '@/lib/utils';
 import type { Group, GroupMember, User, RoleName } from './data';
@@ -536,6 +537,8 @@ export const GroupDetail: React.FC<GroupDetailProps> = ({ group, onUpdateGroup, 
   const [removeOpen, setRemoveOpen] = useState(false);
   const [removeMember, setRemoveMember] = useState<GroupMember | null>(null);
   const [memberSearch, setMemberSearch] = useState('');
+  const [accessSearch, setAccessSearch] = useState('');
+  const [accessResourceFilters, setAccessResourceFilters] = useState<Set<string>>(new Set());
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   const owners = group.members.filter(m => m.role === 'owner');
@@ -544,6 +547,24 @@ export const GroupDetail: React.FC<GroupDetailProps> = ({ group, onUpdateGroup, 
     m.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
     m.email.toLowerCase().includes(memberSearch.toLowerCase())
   );
+
+  const accessResourceTypes = [...new Set(group.accessBindings.map(b => b.resourceType))];
+
+  const toggleResourceFilter = (rt: string) => {
+    setAccessResourceFilters(prev => {
+      const next = new Set(prev);
+      if (next.has(rt)) next.delete(rt);
+      else next.add(rt);
+      return next;
+    });
+  };
+
+  const filteredBindings = group.accessBindings.filter(b => {
+    if (accessResourceFilters.size > 0 && !accessResourceFilters.has(b.resourceType)) return false;
+    if (!accessSearch) return true;
+    const q = accessSearch.toLowerCase();
+    return b.resourceName.toLowerCase().includes(q) || b.resourceType.toLowerCase().includes(q);
+  });
 
   const handleAddMembers = (userIds: string[]) => {
     const newMembers: GroupMember[] = userIds.map(id => {
@@ -698,12 +719,93 @@ export const GroupDetail: React.FC<GroupDetailProps> = ({ group, onUpdateGroup, 
 
           {/* Access Tab */}
           <Tabs.Content value="access" forceMount className="flex-1 flex flex-col min-h-0 outline-none data-[state=inactive]:hidden">
+            {group.accessBindings.length > 0 && (
+              <div className="px-6 py-3 flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2 px-2.5 h-8 rounded-lg border border-gray-6 bg-white w-[240px]">
+                  <Search size={13} className="text-gray-8 shrink-0" />
+                  <input
+                    type="text"
+                    placeholder="Search by name..."
+                    value={accessSearch}
+                    onChange={(e) => setAccessSearch(e.target.value)}
+                    className="flex-1 bg-transparent text-[13px] text-gray-12 placeholder:text-gray-8 outline-none"
+                  />
+                </div>
+                {accessResourceTypes.length > 1 && (
+                  <Popover.Root>
+                    <Popover.Trigger asChild>
+                      <button className={cn(
+                        'flex items-center gap-1.5 h-8 px-2.5 rounded-lg border text-[12px] font-medium transition-colors',
+                        accessResourceFilters.size > 0
+                          ? 'border-[#5B5CE6] bg-[#0011FF08] text-[#5B5CE6]'
+                          : 'border-gray-6 text-gray-9 hover:text-gray-11 hover:border-gray-7',
+                      )}>
+                        <Filter size={13} />
+                        Resource Type
+                        {accessResourceFilters.size > 0 && (
+                          <span className="bg-[#5B5CE6] text-white text-[10px] px-1.5 py-0.5 rounded-full font-medium">
+                            {accessResourceFilters.size}
+                          </span>
+                        )}
+                      </button>
+                    </Popover.Trigger>
+                    <Popover.Portal>
+                      <Popover.Content
+                        align="start"
+                        sideOffset={4}
+                        className="bg-white rounded-lg shadow-xl border border-gray-5 py-1 w-[200px] z-50 animate-in fade-in slide-in-from-top-1 duration-150"
+                      >
+                        {accessResourceTypes.map(rt => {
+                          const Icon = RESOURCE_ICONS[rt] ?? ShieldCheck;
+                          const isSelected = accessResourceFilters.has(rt);
+                          return (
+                            <button
+                              key={rt}
+                              onClick={() => toggleResourceFilter(rt)}
+                              className={cn(
+                                'w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] transition-colors text-left',
+                                isSelected ? 'bg-[#0011FF08] text-[#2E1E71]' : 'text-gray-11 hover:bg-gray-2',
+                              )}
+                            >
+                              <div className={cn(
+                                'w-4 h-4 rounded border-2 flex items-center justify-center transition-colors shrink-0',
+                                isSelected ? 'bg-[#5B5CE6] border-[#5B5CE6]' : 'border-gray-7',
+                              )}>
+                                {isSelected && <Check size={10} className="text-white" />}
+                              </div>
+                              <Icon size={13} className={isSelected ? 'text-[#5B5CE6]' : 'text-gray-9'} />
+                              {rt}
+                            </button>
+                          );
+                        })}
+                        {accessResourceFilters.size > 0 && (
+                          <>
+                            <div className="h-px bg-gray-4 my-1" />
+                            <button
+                              onClick={() => setAccessResourceFilters(new Set())}
+                              className="w-full px-3 py-1.5 text-[12px] text-gray-9 hover:text-gray-11 transition-colors text-left"
+                            >
+                              Clear filters
+                            </button>
+                          </>
+                        )}
+                      </Popover.Content>
+                    </Popover.Portal>
+                  </Popover.Root>
+                )}
+              </div>
+            )}
             <div className="flex-1 min-h-0 overflow-y-auto">
               {group.accessBindings.length === 0 ? (
                 <div className="px-6 py-12 text-center">
                   <ShieldCheck size={28} className="text-gray-6 mx-auto mb-3" />
                   <p className="text-[13px] text-gray-9">No access bindings for this group</p>
                   <p className="text-[12px] text-gray-8 mt-1">Grant access to resources to see them listed here.</p>
+                </div>
+              ) : filteredBindings.length === 0 ? (
+                <div className="px-6 py-12 text-center">
+                  <Search size={28} className="text-gray-6 mx-auto mb-3" />
+                  <p className="text-[13px] text-gray-9">No access bindings match your search</p>
                 </div>
               ) : (
                 <div className="px-6 py-3">
@@ -716,7 +818,7 @@ export const GroupDetail: React.FC<GroupDetailProps> = ({ group, onUpdateGroup, 
                       </tr>
                     </thead>
                     <tbody>
-                      {group.accessBindings.map(binding => {
+                      {filteredBindings.map(binding => {
                         const Icon = RESOURCE_ICONS[binding.resourceType] ?? ShieldCheck;
                         return (
                           <tr key={binding.id} className="border-b border-gray-3 last:border-b-0">
