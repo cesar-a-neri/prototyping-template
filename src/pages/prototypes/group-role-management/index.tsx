@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Users, Settings, LogOut, KeyRound, Plus, BookOpen,
   ArrowLeft, Search, MoreHorizontal, Pencil, Trash2,
@@ -7,6 +7,7 @@ import * as Separator from '@radix-ui/react-separator';
 import * as Tabs from '@radix-ui/react-tabs';
 import { cn } from '@/lib/utils';
 import { useTweakpane } from '@/lib/tweakpane';
+import { useTheme } from '@/lib/theme';
 import {
   NavShell, HubGroup, AccountPicker, BRAND, BRAND_LIGHT,
   useOutsideClick, ShowIconsContext, ShowDescriptionsContext,
@@ -485,6 +486,13 @@ const ManagementPanel: React.FC<ManagementPanelProps> = ({ groups, onUpdateGroup
 // ─── Main Prototype ───────────────────────────────────────────────────────────
 
 const GroupRoleManagement: React.FC = () => {
+  const { theme, setTheme } = useTheme();
+  useEffect(() => {
+    const prev = theme.mode;
+    setTheme('light');
+    return () => setTheme(prev);
+  }, []);
+
   const { params } = useTweakpane(
     { showUsersTab: true, groupsLayout: 'sidebar' },
     { groupsLayout: { options: { 'Sidebar': 'sidebar', 'Full Page': 'full-page' } } },
