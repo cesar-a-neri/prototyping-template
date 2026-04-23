@@ -98,13 +98,13 @@ const MemberAvatar: React.FC<{ member: User | GroupMember; size?: 'sm' | 'md' }>
 // ─── Add Members Dialog ───────────────────────────────────────────────────────
 
 type AddMode = null | 'existing' | 'new';
-type AddMethod = null | 'select' | 'email' | 'csv';
+type AddMethod = null | 'select' | 'csv';
 
 interface AddMembersDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   existingMemberIds: string[];
-  onAdd: (userIds: string[]) => void;
+  onAdd: (userIds: string[], role: 'owner' | 'member') => void;
   initialMode?: AddMode;
 }
 
@@ -116,12 +116,13 @@ export const AddMembersDialog: React.FC<AddMembersDialogProps> = ({ open, onOpen
   const [method, setMethod] = useState<AddMethod>(null);
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
-  const [emailInput, setEmailInput] = useState('');
+  const [selectedRole, setSelectedRole] = useState<'owner' | 'member'>('member');
   const [csvContent, setCsvContent] = useState('');
   const [dragOver, setDragOver] = useState(false);
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
-    if (open) { setMode(initialMode ?? null); setMethod(null); setSearch(''); setSelected([]); setEmailInput(''); setCsvContent(''); }
+    if (open) { setMode(initialMode ?? null); setMethod(null); setSearch(''); setSelected([]); setSelectedRole('member'); setCsvContent(''); }
   }, [open, initialMode]);
 
   const available = MOCK_USERS.filter(u => !existingMemberIds.includes(u.id));
@@ -141,18 +142,15 @@ export const AddMembersDialog: React.FC<AddMembersDialogProps> = ({ open, onOpen
 
   const canGoBack = method !== null || (!initialMode && mode !== null);
 
-  const emailCount = emailInput.split(',').map(e => e.trim()).filter(Boolean).length;
-
   const canSubmit = () => {
     if (method === 'select') return selected.length > 0;
-    if (method === 'email') return emailCount > 0;
     if (method === 'csv') return csvContent.trim().length > 0;
     return false;
   };
 
   const handleSubmit = () => {
     if (method === 'select') {
-      onAdd(selected);
+      onAdd(selected, selectedRole);
     }
     onOpenChange(false);
   };
@@ -229,18 +227,6 @@ export const AddMembersDialog: React.FC<AddMembersDialogProps> = ({ open, onOpen
         </button>
       )}
       <button
-        onClick={() => setMethod('email')}
-        className="w-full flex items-center gap-4 px-4 py-3.5 rounded-lg border border-gray-5 hover:border-[#5B5CE6] hover:bg-[#0011FF04] transition-all text-left group"
-      >
-        <div className="w-9 h-9 rounded-lg bg-gray-3 flex items-center justify-center shrink-0">
-          <Mail size={16} className="text-gray-10" />
-        </div>
-        <div>
-          <p className="text-[13px] font-semibold text-gray-12 group-hover:text-[#5B5CE6] transition-colors">Enter email addresses</p>
-          <p className="text-[12px] text-gray-9 mt-0.5">Type or paste comma-separated emails</p>
-        </div>
-      </button>
-      <button
         onClick={() => setMethod('csv')}
         className="w-full flex items-center gap-4 px-4 py-3.5 rounded-lg border border-gray-5 hover:border-[#5B5CE6] hover:bg-[#0011FF04] transition-all text-left group"
       >
@@ -258,31 +244,77 @@ export const AddMembersDialog: React.FC<AddMembersDialogProps> = ({ open, onOpen
   const renderSelectView = () => (
     <>
       <div className="px-6 pb-3">
-        <div className="flex items-center gap-2 px-3 h-9 rounded-lg border border-gray-6 bg-white">
-          <Search size={14} className="text-gray-8 shrink-0" />
-          <input
-            autoFocus
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name or email..."
-            className="flex-1 bg-transparent text-[13px] text-gray-12 placeholder:text-gray-8 outline-none"
-          />
-        </div>
-        {selected.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-2">
+        <div className="flex items-center gap-2">
+          <div
+            onClick={() => searchInputRef.current?.focus()}
+            className={cn(
+              'flex-1 flex flex-wrap items-center gap-1.5 px-3 min-h-[36px] py-1.5 rounded-lg border bg-white cursor-text transition-colors',
+              selected.length > 0 ? 'border-[#5B5CE6]' : 'border-gray-6',
+            )}
+          >
+            <Search size={14} className="text-gray-8 shrink-0" />
             {selected.map(id => {
               const u = MOCK_USERS.find(u => u.id === id)!;
               return (
-                <span key={id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#EEEEFF] text-[#5B5CE6] text-[12px] font-medium">
+                <span key={id} className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-md bg-[#EEEEFF] text-[#5B5CE6] text-[12px] font-medium whitespace-nowrap">
                   {u.name}
-                  <button onClick={() => toggle(id)} className="hover:text-[#2E1E71]">
-                    <X size={12} />
+                  <button
+                    onClick={(e) => { e.stopPropagation(); toggle(id); }}
+                    className="w-4 h-4 rounded flex items-center justify-center hover:bg-[#5B5CE6]/10 hover:text-[#2E1E71] transition-colors"
+                  >
+                    <X size={10} />
                   </button>
                 </span>
               );
             })}
+            <input
+              ref={searchInputRef}
+              autoFocus
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Backspace' && !search && selected.length > 0) {
+                  setSelected(prev => prev.slice(0, -1));
+                }
+              }}
+              placeholder={selected.length === 0 ? 'Search by name or email...' : ''}
+              className="flex-1 min-w-[80px] bg-transparent text-[13px] text-gray-12 placeholder:text-gray-8 outline-none py-0.5"
+            />
           </div>
-        )}
+          {selected.length > 0 && (
+            <DropdownMenu.Root>
+              <DropdownMenu.Trigger asChild>
+                <button className="flex items-center gap-1 h-9 px-3 rounded-lg border border-gray-6 bg-white text-[13px] font-medium text-gray-11 hover:bg-gray-2 transition-colors whitespace-nowrap shrink-0">
+                  {selectedRole === 'owner' ? 'Owner' : 'Member'}
+                  <ChevronDown size={13} className="text-gray-8" />
+                </button>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Portal>
+                <DropdownMenu.Content
+                  align="end"
+                  sideOffset={4}
+                  className="bg-white rounded-lg shadow-xl border border-gray-5 py-1 w-[140px] z-50 animate-in fade-in slide-in-from-top-1 duration-150"
+                >
+                  {(['member', 'owner'] as const).map(r => (
+                    <DropdownMenu.Item
+                      key={r}
+                      onClick={() => setSelectedRole(r)}
+                      className={cn(
+                        'flex items-center justify-between px-3 py-1.5 text-[13px] cursor-pointer outline-none transition-colors',
+                        r === selectedRole
+                          ? 'text-[#5B5CE6] bg-[#0011FF08]'
+                          : 'text-gray-11 hover:bg-[#0011FF0F] hover:text-[#2E1E71]',
+                      )}
+                    >
+                      {r === 'owner' ? 'Owner' : 'Member'}
+                      {r === selectedRole && <Check size={13} className="text-[#5B5CE6]" />}
+                    </DropdownMenu.Item>
+                  ))}
+                </DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
+          )}
+        </div>
       </div>
       <ScrollArea.Root className="h-[240px]">
         <ScrollArea.Viewport className="h-full w-full px-6">
@@ -329,26 +361,6 @@ export const AddMembersDialog: React.FC<AddMembersDialogProps> = ({ open, onOpen
         </ScrollArea.Scrollbar>
       </ScrollArea.Root>
     </>
-  );
-
-  const renderEmailView = () => (
-    <div className="px-6 pb-4">
-      <label className="text-[12px] font-medium text-gray-11 block mb-1.5">
-        Email addresses
-      </label>
-      <textarea
-        autoFocus
-        value={emailInput}
-        onChange={(e) => setEmailInput(e.target.value)}
-        placeholder="user1@example.com, user2@example.com..."
-        rows={5}
-        className="w-full px-3 py-2 rounded-lg border border-gray-6 bg-white text-[13px] text-gray-12 placeholder:text-gray-8 outline-none focus:border-[#5B5CE6] transition-colors resize-none"
-      />
-      <p className="text-[11px] text-gray-8 mt-1.5">
-        Separate multiple emails with commas.
-        {emailCount > 0 && <span className="text-gray-11 font-medium"> {emailCount} email{emailCount !== 1 ? 's' : ''} detected.</span>}
-      </p>
-    </div>
   );
 
   const renderCsvView = () => {
@@ -404,8 +416,7 @@ export const AddMembersDialog: React.FC<AddMembersDialogProps> = ({ open, onOpen
     : !method
       ? mode === 'existing' ? 'Add Existing Users' : 'Invite New Users'
       : method === 'select' ? 'Search & Select'
-        : method === 'email' ? `Enter Email Addresses`
-          : 'Upload CSV';
+        : 'Upload CSV';
 
   const subtitle = !mode
     ? 'Choose how you want to add members to this group.'
@@ -446,14 +457,12 @@ export const AddMembersDialog: React.FC<AddMembersDialogProps> = ({ open, onOpen
           {!mode && renderModeSelection()}
           {mode && !method && renderMethodSelection()}
           {method === 'select' && renderSelectView()}
-          {method === 'email' && renderEmailView()}
           {method === 'csv' && renderCsvView()}
 
           {method && (
             <div className="px-6 py-4 border-t border-gray-4 flex items-center justify-between">
               <span className="text-[12px] text-gray-9">
-                {method === 'select' && `${selected.length} selected`}
-                {method === 'email' && `${emailCount} email${emailCount !== 1 ? 's' : ''}`}
+                {method === 'select' && `${selected.length} selected as ${selectedRole}`}
                 {method === 'csv' && (csvContent ? `${csvContent.split('\n').filter(Boolean).length} rows` : 'No file')}
               </span>
               <div className="flex items-center gap-2">
@@ -566,10 +575,10 @@ export const GroupDetail: React.FC<GroupDetailProps> = ({ group, onUpdateGroup, 
     return b.resourceName.toLowerCase().includes(q) || b.resourceType.toLowerCase().includes(q);
   });
 
-  const handleAddMembers = (userIds: string[]) => {
+  const handleAddMembers = (userIds: string[], role: 'owner' | 'member') => {
     const newMembers: GroupMember[] = userIds.map(id => {
       const u = MOCK_USERS.find(u => u.id === id)!;
-      return { ...u, role: 'member' as const, addedAt: new Date().toISOString().split('T')[0] };
+      return { ...u, role, addedAt: new Date().toISOString().split('T')[0] };
     });
     onUpdateGroup({ ...group, members: [...group.members, ...newMembers] });
   };

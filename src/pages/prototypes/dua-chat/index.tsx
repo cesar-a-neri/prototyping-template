@@ -12,10 +12,16 @@ import {
     Square,
     XCircle,
     SlidersHorizontal,
+    Search,
+    X,
+    MoreHorizontal,
+    Pencil,
+    Trash2,
 } from 'lucide-react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faUpRightFromSquare } from '@fortawesome/free-solid-svg-icons';
 import { cn } from '@/lib/utils';
+import { useTweakpane } from '@/lib/tweakpane';
 
 interface Message {
     id: string;
@@ -1108,6 +1114,23 @@ const RichText: React.FC<{ content: string; animate?: boolean; onUpdate?: () => 
     return <div className="space-y-0.5">{elements}</div>;
 };
 
+// ─── Search Highlight Helper ──────────────────────────────────────────────────
+
+const HighlightMatch: React.FC<{ text: string; query: string }> = ({ text, query }) => {
+    if (!query.trim()) return <>{text}</>;
+    const idx = text.toLowerCase().indexOf(query.toLowerCase());
+    if (idx === -1) return <>{text}</>;
+    return (
+        <>
+            {text.slice(0, idx)}
+            <mark style={{ background: '#ede9fe', color: '#5746d4', borderRadius: '2px', padding: '0 1px' }}>
+                {text.slice(idx, idx + query.length)}
+            </mark>
+            {text.slice(idx + query.length)}
+        </>
+    );
+};
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 const MIN_SIDEBAR_WIDTH = 140;
@@ -1136,6 +1159,34 @@ const DuaChat: React.FC = () => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const stopRequestedRef = useRef(false);
+
+    const { params } = useTweakpane(
+        { searchVariant: 'expandable' },
+        {
+            searchVariant: {
+                options: {
+                    'Inline — persistent input': 'inline',
+                    'Float — overlay dropdown': 'float',
+                    'Expandable — icon morphs': 'expandable',
+                },
+            },
+        },
+    );
+    const searchVariant = params.searchVariant;
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchOpen, setSearchOpen] = useState(false);
+    const searchPanelRef = useRef<HTMLDivElement>(null);
+    const searchInputRef = useRef<HTMLInputElement>(null);
+    const filteredThreads = threads.filter(t =>
+        t.title.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    const [openMenuThreadId, setOpenMenuThreadId] = useState<string | null>(null);
+    const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+    const [renamingThreadId, setRenamingThreadId] = useState<string | null>(null);
+    const [renameValue, setRenameValue] = useState('');
+    const menuRef = useRef<HTMLDivElement>(null);
+    const renameInputRef = useRef<HTMLInputElement>(null);
 
     const activeThread = threads.find(t => t.id === activeThreadId) ?? null;
     const hasMessages = (activeThread?.messages.length ?? 0) > 0;
@@ -1212,6 +1263,74 @@ const DuaChat: React.FC = () => {
 
         document.addEventListener('mousemove', onMouseMove);
         document.addEventListener('mouseup', onMouseUp);
+    };
+
+    // Close float panel on outside click
+    useEffect(() => {
+        if (!searchOpen || searchVariant !== 'float') return;
+        const handler = (e: MouseEvent) => {
+            if (searchPanelRef.current && !searchPanelRef.current.contains(e.target as Node)) {
+                setSearchOpen(false);
+                setSearchQuery('');
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [searchOpen, searchVariant]);
+
+    // Reset search state when switching variants
+    useEffect(() => {
+        setSearchQuery('');
+        setSearchOpen(false);
+    }, [searchVariant]);
+
+    // Close thread menu on outside click
+    useEffect(() => {
+        if (!openMenuThreadId) return;
+        const handler = (e: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+                setOpenMenuThreadId(null);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [openMenuThreadId]);
+
+    const openThreadMenu = (e: React.MouseEvent, threadId: string) => {
+        e.stopPropagation();
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        setMenuPosition({ top: rect.bottom + 4, left: rect.left });
+        setOpenMenuThreadId(threadId);
+    };
+
+    const startRenaming = (threadId: string) => {
+        const thread = threads.find(t => t.id === threadId);
+        if (!thread) return;
+        setOpenMenuThreadId(null);
+        setRenamingThreadId(threadId);
+        setRenameValue(thread.title);
+        setTimeout(() => renameInputRef.current?.focus(), 50);
+    };
+
+    const commitRename = () => {
+        if (!renamingThreadId) return;
+        const trimmed = renameValue.trim();
+        if (trimmed) {
+            setThreads(prev => prev.map(t => t.id === renamingThreadId ? { ...t, title: trimmed } : t));
+        }
+        setRenamingThreadId(null);
+        setRenameValue('');
+    };
+
+    const cancelRename = () => {
+        setRenamingThreadId(null);
+        setRenameValue('');
+    };
+
+    const deleteThread = (threadId: string) => {
+        setOpenMenuThreadId(null);
+        setThreads(prev => prev.filter(t => t.id !== threadId));
+        if (activeThreadId === threadId) setActiveThreadId(null);
     };
 
     const createNewThread = () => {
@@ -1291,6 +1410,7 @@ const DuaChat: React.FC = () => {
     };
 
     return (
+        <>
         <div className="flex h-screen bg-white overflow-hidden">
 
             {/* ── Sidebar ── */}
@@ -1342,7 +1462,7 @@ const DuaChat: React.FC = () => {
                     </div>
 
                     {/* Nav section */}
-                    <div className="flex-1 overflow-y-auto pt-4 flex flex-col gap-1">
+                    <div className="flex-1 flex flex-col overflow-hidden pt-4 gap-1">
 
                         {/* New Thread */}
                         <button
@@ -1356,26 +1476,223 @@ const DuaChat: React.FC = () => {
                             {!sidebarCollapsed && <span>New Thread</span>}
                         </button>
 
-                        {/* Threads label */}
-                        {!sidebarCollapsed && (
+                        {/* ── Variant 1: Inline — persistent search input ── */}
+                        {!sidebarCollapsed && searchVariant === 'inline' && (
+                            <div className="px-2 pb-1 flex-shrink-0">
+                                <div className="relative">
+                                    <Search
+                                        className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none"
+                                        style={{ color: '#818ea9' }}
+                                    />
+                                    <input
+                                        ref={searchInputRef}
+                                        type="text"
+                                        value={searchQuery}
+                                        onChange={e => setSearchQuery(e.target.value)}
+                                        placeholder="Search threads..."
+                                        className="w-full h-8 pl-8 pr-7 rounded-md text-[13px] outline-none"
+                                        style={{ backgroundColor: '#f0f0f3', color: '#19202f' }}
+                                    />
+                                    {searchQuery && (
+                                        <button
+                                            onClick={() => setSearchQuery('')}
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center w-4 h-4 rounded-full hover:bg-gray-4 transition-colors"
+                                        >
+                                            <X className="w-3 h-3" style={{ color: '#818ea9' }} />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── Variant 2: Float — trigger button + overlay dropdown ── */}
+                        {!sidebarCollapsed && searchVariant === 'float' && (
+                            <div className="relative flex-shrink-0" ref={searchPanelRef}>
+                                <button
+                                    onClick={() => setSearchOpen(v => !v)}
+                                    className={cn(
+                                        'flex items-center gap-2 w-full h-10 px-2 rounded-md text-gray-12 transition-colors text-sm',
+                                        searchOpen ? 'bg-gray-3' : 'hover:bg-gray-3'
+                                    )}
+                                >
+                                    <Search className="w-4 h-4 flex-shrink-0" />
+                                    <span>Search threads...</span>
+                                </button>
+
+                                {searchOpen && (
+                                    <div
+                                        className="absolute left-0 right-0 top-full mt-1 z-20 rounded-xl overflow-hidden flex flex-col"
+                                        style={{
+                                            backgroundColor: '#ffffff',
+                                            border: '1px solid #e9e9eb',
+                                            boxShadow: '0px 8px 24px rgba(0,0,0,0.14)',
+                                            maxHeight: '280px',
+                                        }}
+                                    >
+                                        <div
+                                            className="flex items-center gap-2 px-3 py-2.5 flex-shrink-0"
+                                            style={{ borderBottom: '1px solid #e9e9eb' }}
+                                        >
+                                            <Search className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#818ea9' }} />
+                                            <input
+                                                ref={searchInputRef}
+                                                type="text"
+                                                value={searchQuery}
+                                                onChange={e => setSearchQuery(e.target.value)}
+                                                onKeyDown={e => {
+                                                    if (e.key === 'Escape') { setSearchOpen(false); setSearchQuery(''); }
+                                                }}
+                                                placeholder="Search threads..."
+                                                autoFocus
+                                                className="flex-1 min-w-0 text-[13px] bg-transparent outline-none"
+                                                style={{ color: '#19202f' }}
+                                            />
+                                            {searchQuery && (
+                                                <button onClick={() => setSearchQuery('')} className="flex-shrink-0">
+                                                    <X className="w-3 h-3" style={{ color: '#818ea9' }} />
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="overflow-y-auto flex-1">
+                                            {filteredThreads.length === 0 ? (
+                                                <p className="text-center text-[13px] py-4" style={{ color: '#818ea9' }}>
+                                                    No threads found
+                                                </p>
+                                            ) : (
+                                                filteredThreads.map(thread => (
+                                                    <button
+                                                        key={thread.id}
+                                                        onClick={() => {
+                                                            setActiveThreadId(thread.id);
+                                                            setSearchOpen(false);
+                                                            setSearchQuery('');
+                                                        }}
+                                                        className={cn(
+                                                            'flex items-center w-full px-3 py-2 text-left hover:bg-gray-2 transition-colors',
+                                                            activeThreadId === thread.id && 'bg-gray-2'
+                                                        )}
+                                                    >
+                                                        <span className="truncate text-[13px] font-medium" style={{ color: '#45464F' }}>
+                                                            <HighlightMatch text={thread.title} query={searchQuery} />
+                                                        </span>
+                                                    </button>
+                                                ))
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* ── Variant 3: Expandable — "Threads" label morphs into search input ── */}
+                        {!sidebarCollapsed && searchVariant === 'expandable' && (
+                            <div className="flex items-center h-10 px-2 flex-shrink-0 overflow-hidden">
+                                {!searchOpen ? (
+                                    <>
+                                        <span className="flex-1 truncate font-medium leading-6 text-[14px]" style={{ color: '#818EA9' }}>
+                                            Threads
+                                        </span>
+                                        <button
+                                            onClick={() => {
+                                                setSearchOpen(true);
+                                                setTimeout(() => searchInputRef.current?.focus(), 50);
+                                            }}
+                                            className="flex items-center justify-center w-6 h-6 rounded-md hover:bg-gray-3 transition-colors flex-shrink-0"
+                                            style={{ color: '#818EA9' }}
+                                        >
+                                            <Search className="w-3.5 h-3.5" />
+                                        </button>
+                                    </>
+                                ) : (
+                                    <div className="flex items-center gap-1.5 w-full">
+                                        <Search className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#818ea9' }} />
+                                        <input
+                                            ref={searchInputRef}
+                                            type="text"
+                                            value={searchQuery}
+                                            onChange={e => setSearchQuery(e.target.value)}
+                                            onKeyDown={e => {
+                                                if (e.key === 'Escape') { setSearchOpen(false); setSearchQuery(''); }
+                                            }}
+                                            placeholder="Search..."
+                                            className="flex-1 min-w-0 text-[13px] bg-transparent outline-none"
+                                            style={{ color: '#19202f' }}
+                                        />
+                                        <button
+                                            onClick={() => { setSearchOpen(false); setSearchQuery(''); }}
+                                            className="flex items-center justify-center w-5 h-5 rounded-full hover:bg-gray-3 flex-shrink-0 transition-colors"
+                                        >
+                                            <X className="w-3 h-3" style={{ color: '#818ea9' }} />
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Threads label (inline + float variants) */}
+                        {!sidebarCollapsed && (searchVariant === 'inline' || searchVariant === 'float') && (
                             <div className="flex items-center h-10 px-2 flex-shrink-0 select-none overflow-hidden">
                                 <span className="truncate font-medium leading-6 text-[14px]" style={{ color: '#818EA9' }}>Threads</span>
                             </div>
                         )}
 
-                        {/* Thread items */}
-                        {!sidebarCollapsed && threads.map(thread => (
-                            <button
-                                key={thread.id}
-                                onClick={() => setActiveThreadId(thread.id)}
-                                className={cn(
-                                    'flex items-center h-10 px-2 rounded-md text-left text-sm hover:bg-gray-3 transition-colors flex-shrink-0',
-                                    activeThreadId === thread.id && 'bg-gray-3'
-                                )}
-                            >
-                                <span className="truncate font-medium text-[14px] leading-6" style={{ color: '#45464F' }}>{thread.title}</span>
-                            </button>
-                        ))}
+                        {/* Scrollable thread list */}
+                        <div className="overflow-y-auto flex flex-col gap-1 flex-1">
+                            {!sidebarCollapsed && (searchVariant === 'float' ? threads : filteredThreads).map(thread => (
+                                <div
+                                    key={thread.id}
+                                    onClick={() => renamingThreadId !== thread.id && setActiveThreadId(thread.id)}
+                                    className={cn(
+                                        'group relative flex items-center h-10 px-2 rounded-md text-sm transition-colors flex-shrink-0',
+                                        renamingThreadId === thread.id
+                                            ? 'cursor-default bg-violet-3'
+                                            : cn('hover:bg-gray-3 cursor-pointer', activeThreadId === thread.id && 'bg-gray-3')
+                                    )}
+                                >
+                                    {renamingThreadId === thread.id ? (
+                                        <input
+                                            ref={renameInputRef}
+                                            value={renameValue}
+                                            onChange={e => setRenameValue(e.target.value)}
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter') commitRename();
+                                                if (e.key === 'Escape') cancelRename();
+                                            }}
+                                            onBlur={commitRename}
+                                            onClick={e => e.stopPropagation()}
+                                            className="flex-1 min-w-0 font-medium text-[14px] leading-6 bg-transparent outline-none"
+                                            style={{ color: '#19202f' }}
+                                        />
+                                    ) : (
+                                        <>
+                                            <span className="flex-1 min-w-0 truncate font-medium text-[14px] leading-6" style={{ color: '#45464F' }}>
+                                                {searchVariant !== 'float' && searchQuery
+                                                    ? <HighlightMatch text={thread.title} query={searchQuery} />
+                                                    : thread.title
+                                                }
+                                            </span>
+                                            <button
+                                                onClick={e => openThreadMenu(e, thread.id)}
+                                                className={cn(
+                                                    'flex items-center justify-center w-6 h-6 rounded transition-all flex-shrink-0 ml-1',
+                                                    openMenuThreadId === thread.id
+                                                        ? 'opacity-100 bg-gray-4'
+                                                        : 'opacity-0 group-hover:opacity-100 hover:bg-gray-4'
+                                                )}
+                                                style={{ color: '#818ea9' }}
+                                            >
+                                                <MoreHorizontal className="w-3.5 h-3.5" />
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                            ))}
+                            {!sidebarCollapsed && searchVariant !== 'float' && searchQuery && filteredThreads.length === 0 && (
+                                <div className="px-2 py-3 text-center">
+                                    <p className="text-[13px]" style={{ color: '#818ea9' }}>No threads found</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     {/* Bottom links */}
@@ -1561,6 +1878,38 @@ const DuaChat: React.FC = () => {
                 )}
             </div>
         </div>
+
+        {/* Thread context menu */}
+        {openMenuThreadId && menuPosition && (
+            <div
+                ref={menuRef}
+                className="fixed z-[1000] py-1 rounded-lg overflow-hidden"
+                style={{
+                    top: menuPosition.top,
+                    left: menuPosition.left,
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #e9e9eb',
+                    boxShadow: '0px 4px 16px rgba(0,0,0,0.12)',
+                    minWidth: '144px',
+                }}
+            >
+                <button
+                    onClick={() => startRenaming(openMenuThreadId)}
+                    className="flex items-center gap-2.5 w-full px-3 py-1.5 text-left hover:bg-gray-2 transition-colors"
+                >
+                    <Pencil className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#5b6579' }} />
+                    <span className="text-[13px]" style={{ color: '#19202f' }}>Rename</span>
+                </button>
+                <button
+                    onClick={() => deleteThread(openMenuThreadId)}
+                    className="flex items-center gap-2.5 w-full px-3 py-1.5 text-left hover:bg-gray-2 transition-colors"
+                >
+                    <Trash2 className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#e5484d' }} />
+                    <span className="text-[13px]" style={{ color: '#e5484d' }}>Delete</span>
+                </button>
+            </div>
+        )}
+        </>
     );
 };
 
