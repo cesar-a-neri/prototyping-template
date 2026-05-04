@@ -755,7 +755,6 @@ const ControlPlaneLeftSidebar: React.FC<ControlPlaneLeftSidebarProps> = ({ activ
 
   const renderEntityRow = (entity: Tenant | Org, entityType: 'org' | 'tenant', readonly = false) => {
     const menuId = `${entityType}-${entity.id}`;
-    const newLabel = entityType === 'tenant' ? 'New Tenant' : 'New Org';
     return (
       <div key={entity.id} className="mb-0.5">
         <div className="group/entity flex items-center">
