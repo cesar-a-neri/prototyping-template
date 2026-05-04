@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import {
   Users, Settings, LogOut, KeyRound, Plus, BookOpen,
   ArrowLeft, Search, MoreHorizontal, Pencil, Trash2,
-  ShieldCheck, ChevronDown, LayoutGrid, Archive, X, Check, UserMinus, Building2, Layers,
+  ShieldCheck, ChevronDown, LayoutGrid, X, Check, Building2, Layers,
 } from 'lucide-react';
 import * as Separator from '@radix-ui/react-separator';
 import * as Tabs from '@radix-ui/react-tabs';
@@ -12,7 +12,6 @@ import { useTweakpane } from '@/lib/tweakpane';
 import {
   NavShell, HubGroup, AccountPicker, BRAND, BRAND_LIGHT,
   useOutsideClick, ShowIconsContext, ShowDescriptionsContext,
-  HexagonNodes,
 } from '../sgp-nav/SgpNav';
 import { GroupManagement, GroupFormDialog } from './GroupManagement';
 import { GroupDetail } from './GroupDetail';
@@ -721,7 +720,7 @@ const ControlPlaneLeftSidebar: React.FC<ControlPlaneLeftSidebarProps> = ({ activ
 
   const renderTenantNavItems = (tenantId: string) => (
     <div className="pl-2 mt-0.5 space-y-0.5 border-l border-gray-5 ml-3">
-      {tenantNavItems.map(({ value, label, Icon }) => (
+      {tenantNavItems.map(({ value, label }) => (
         <button
           key={value}
           onClick={() => { setActiveTenantId(tenantId); onSetActiveView(value); }}
@@ -976,7 +975,7 @@ const ManagementPanel: React.FC<ManagementPanelProps> = ({ groups, onUpdateGroup
   const handleNavigateToGroup = (groupName: string) => {
     const target = groups.find(g => g.name === groupName);
     if (target) {
-      setActiveView('groups');
+      onSetActiveView('groups');
       setSelectedGroupId(target.id);
     }
   };

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Globe, ArrowUpDown, Users, Plus, Mail, MoreHorizontal, UserMinus, Check, X, ChevronDown } from 'lucide-react';
+import { Search, Globe, ArrowUpDown, Users, Plus, Mail, MoreHorizontal, Check, X, ChevronDown } from 'lucide-react';
 import * as ScrollArea from '@radix-ui/react-scroll-area';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import * as Popover from '@radix-ui/react-popover';
