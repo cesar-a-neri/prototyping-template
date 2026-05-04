@@ -781,12 +781,8 @@ const ControlPlaneLeftSidebar: React.FC<ControlPlaneLeftSidebarProps> = ({ activ
                 <DropdownMenu.Item onClick={() => openDialog(entityType, 'rename', entity.id)} className="flex items-center gap-2 px-3 py-1.5 text-[13px] text-gray-11 hover:bg-[#0011FF0F] hover:text-[#2E1E71] cursor-pointer outline-none transition-colors">
                   Rename
                 </DropdownMenu.Item>
-                <DropdownMenu.Item onClick={() => openArchiveConfirm(entityType, entity.id)} className="flex items-center gap-2 px-3 py-1.5 text-[13px] text-gray-11 hover:bg-red-2 hover:text-red-10 cursor-pointer outline-none transition-colors">
+                <DropdownMenu.Item onClick={() => openArchiveConfirm(entityType, entity.id)} className="flex items-center gap-2 px-3 py-1.5 text-[13px] text-red-10 hover:bg-red-2 cursor-pointer outline-none transition-colors">
                   Archive
-                </DropdownMenu.Item>
-                <DropdownMenu.Separator className="h-px bg-gray-4 my-1" />
-                <DropdownMenu.Item onClick={() => openDialog(entityType, 'create')} className="flex items-center gap-2 px-3 py-1.5 text-[13px] text-gray-11 hover:bg-[#0011FF0F] hover:text-[#2E1E71] cursor-pointer outline-none transition-colors">
-                  <Plus size={13} /> {newLabel}
                 </DropdownMenu.Item>
               </DropdownMenu.Content>
             </DropdownMenu.Portal>
@@ -815,7 +811,7 @@ const ControlPlaneLeftSidebar: React.FC<ControlPlaneLeftSidebarProps> = ({ activ
   );
 
   return (
-    <div className="w-[200px] h-full flex flex-col bg-white border-r border-gray-4 shrink-0">
+    <div className="w-[240px] h-full flex flex-col bg-white border-r border-gray-4 shrink-0">
       {/* Logo */}
       <div className="px-4 py-4 flex items-center gap-2.5 shrink-0">
         <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, rgb(59, 130, 246) 0%, rgb(139, 92, 246) 50%, rgb(59, 130, 246) 100%)' }}>
