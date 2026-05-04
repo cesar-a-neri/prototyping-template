@@ -1033,8 +1033,24 @@ const ExecutionStepsButton: React.FC<{ count: number }> = ({ count }) => {
 
 // Renders assistant message text with **bold**, `code badges`, and - bullet points.
 // When animate=true it types out content character-by-character with natural speed variance.
-const TW_BASE = 2;
-const RichText: React.FC<{ content: string; animate?: boolean; onUpdate?: () => void }> = ({ content, animate = false, onUpdate }) => {
+interface RichTextProps {
+    content: string;
+    animate?: boolean;
+    onUpdate?: () => void;
+    speed?: number;
+    punctuationPause?: number;
+    jitter?: number;
+    burst?: number;
+}
+const RichText: React.FC<RichTextProps> = ({
+    content,
+    animate = false,
+    onUpdate,
+    speed = 2,
+    punctuationPause = 5,
+    jitter = 1,
+    burst = 1,
+}) => {
     const [displayed, setDisplayed] = useState(animate ? '' : content);
     const indexRef = useRef(0);
 
@@ -1045,20 +1061,22 @@ const RichText: React.FC<{ content: string; animate?: boolean; onUpdate?: () => 
 
         const tick = () => {
             if (indexRef.current >= content.length) return;
-            setDisplayed(content.slice(0, indexRef.current + 1));
-            indexRef.current += 1;
+            const nextIdx = Math.min(indexRef.current + Math.max(1, burst), content.length);
+            setDisplayed(content.slice(0, nextIdx));
+            const lastCh = content[nextIdx - 1];
+            indexRef.current = nextIdx;
             onUpdate?.();
-            const ch = content[indexRef.current - 1];
-            const delay = /[.,!?:;\n]/.test(ch)
-                ? TW_BASE * 5 + Math.random() * TW_BASE * 3
-                : TW_BASE + Math.random() * TW_BASE - TW_BASE * 0.4;
+            const jitterRange = speed * jitter;
+            const delay = /[.,!?:;\n]/.test(lastCh)
+                ? speed * punctuationPause + Math.random() * jitterRange * 3
+                : speed + Math.random() * jitterRange - jitterRange * 0.4;
             setTimeout(tick, Math.max(1, delay));
         };
 
-        const id = setTimeout(tick, TW_BASE);
+        const id = setTimeout(tick, speed);
         return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [content, animate]);
+    }, [content, animate, speed, punctuationPause, jitter, burst]);
 
     const renderInline = (text: string) => {
         const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*)/g);
@@ -1161,7 +1179,7 @@ const DuaChat: React.FC = () => {
     const stopRequestedRef = useRef(false);
 
     const { params } = useTweakpane(
-        { searchVariant: 'expandable' },
+        { searchVariant: 'expandable', twSpeed: 2, twPunctuationPause: 5, twJitter: 1, twBurst: 1, skipThinking: false },
         {
             searchVariant: {
                 options: {
@@ -1170,6 +1188,11 @@ const DuaChat: React.FC = () => {
                     'Expandable — icon morphs': 'expandable',
                 },
             },
+            twSpeed: { min: 0, max: 40, step: 1, label: 'Typewriter Speed (ms)' },
+            twPunctuationPause: { min: 1, max: 20, step: 0.5, label: 'Punctuation Pause (×)' },
+            twJitter: { min: 0, max: 3, step: 0.1, label: 'Jitter' },
+            twBurst: { min: 1, max: 20, step: 1, label: 'Chars per Tick' },
+            skipThinking: { label: 'Skip Thinking Step' },
         },
     );
     const searchVariant = params.searchVariant;
@@ -1386,11 +1409,13 @@ const DuaChat: React.FC = () => {
         setIsTyping(true);
 
         // Poll every 100ms so stop is responsive during the thinking delay
+        const thinkingDuration = params.skipThinking ? 0 : 10000;
         await new Promise<void>(resolve => {
+            if (thinkingDuration === 0) { resolve(); return; }
             const id = setInterval(() => {
                 if (stopRequestedRef.current) { clearInterval(id); resolve(); }
             }, 100);
-            setTimeout(() => { clearInterval(id); resolve(); }, 10000);
+            setTimeout(() => { clearInterval(id); resolve(); }, thinkingDuration);
         });
         if (stopRequestedRef.current) return;
 
@@ -1807,6 +1832,10 @@ const DuaChat: React.FC = () => {
                                                         content={msg.content}
                                                         animate={msg.id === latestAssistantId}
                                                         onUpdate={msg.id === latestAssistantId ? () => scrollToBottom() : undefined}
+                                                        speed={params.twSpeed as number}
+                                                        punctuationPause={params.twPunctuationPause as number}
+                                                        jitter={params.twJitter as number}
+                                                        burst={params.twBurst as number}
                                                     />
                                                 </div>
                                             )}

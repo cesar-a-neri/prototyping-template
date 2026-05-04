@@ -5,18 +5,25 @@ import { useTweakpane } from '@/lib/tweakpane';
 // ─── Main Prototype ───────────────────────────────────────────────────────────
 
 const SGPNavPrototype: React.FC = () => {
-  const { params } = useTweakpane({
-    appPickerInBranding: false,
-    showIcons: true,
-    showDescriptions: true,
-  });
+  const { params } = useTweakpane(
+    {
+      appPicker: 'grid-icon',
+      showIcons: true,
+      showDescriptions: true,
+    },
+    {
+      appPicker: {
+        options: { 'Grid icon': 'grid-icon', 'In Branding': 'branding' },
+      },
+    },
+  );
 
   return (
     <ShowIconsContext.Provider value={params.showIcons as boolean}>
       <ShowDescriptionsContext.Provider value={params.showDescriptions as boolean}>
         <div className="min-h-screen bg-gray-2 flex flex-col">
           <div className="shadow-sm">
-            <NavV3 appPickerInBranding={params.appPickerInBranding as boolean} />
+            <NavV3 appPickerInBranding={params.appPicker === 'branding'} />
           </div>
         </div>
       </ShowDescriptionsContext.Provider>

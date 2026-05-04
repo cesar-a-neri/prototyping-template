@@ -4,7 +4,9 @@ import {
   File, Wrench,
   LayoutDashboard, ChartGantt,
   ChevronDown, LayoutGrid, Search,
+  KeyRound, BookOpen, Settings, LogOut,
 } from 'lucide-react';
+import * as Separator from '@radix-ui/react-separator';
 import { cn } from '@/lib/utils';
 
 // ─── Custom Icon Components ───────────────────────────────────────────────────
@@ -370,6 +372,61 @@ const AppSwitcherMenu = ({ onClose }: { onClose: () => void }) => (
   </div>
 );
 
+// ─── User Avatar Dropdown ─────────────────────────────────────────────────────
+
+const UserAvatarDropdown = ({ isOpen, onToggle }: { isOpen: boolean; onToggle: () => void }) => (
+  <div className="relative">
+    <button
+      onClick={onToggle}
+      className={cn(
+        'w-8 h-8 rounded-full flex items-center justify-center text-[16px] font-medium transition-all ring-2',
+        isOpen ? 'ring-[#5B5CE6]' : 'ring-transparent hover:ring-gray-6',
+      )}
+      style={{ background: BRAND_LIGHT, color: BRAND }}
+    >
+      C
+    </button>
+    {isOpen && (
+      <div className="absolute top-full right-0 mt-1.5 bg-white rounded-xl shadow-xl border border-gray-5 z-50 w-[240px] py-1 animate-in fade-in slide-in-from-top-1 duration-150">
+        <div className="px-3 py-2.5">
+          <p className="text-[13px] font-medium text-gray-12">Cesar Neri</p>
+          <p className="text-[12px] text-gray-9">cesar.neri@acme.com</p>
+        </div>
+        <Separator.Root className="h-px bg-gray-4 mx-2" />
+        <div className="py-1 px-1">
+          <button className="flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg text-left hover:bg-gray-2 transition-colors">
+            <div className="w-7 h-7 rounded-md bg-gray-3 flex items-center justify-center text-gray-10">
+              <KeyRound size={14} />
+            </div>
+            <span className="text-[13px] text-gray-11">Access Management</span>
+          </button>
+          <button className="flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg text-left hover:bg-gray-2 transition-colors">
+            <div className="w-7 h-7 rounded-md bg-gray-3 flex items-center justify-center text-gray-10">
+              <BookOpen size={14} />
+            </div>
+            <span className="text-[13px] text-gray-11">Documentation</span>
+          </button>
+          <button className="flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg text-left hover:bg-gray-2 transition-colors">
+            <div className="w-7 h-7 rounded-md bg-gray-3 flex items-center justify-center text-gray-10">
+              <Settings size={14} />
+            </div>
+            <span className="text-[13px] text-gray-11">Account Settings</span>
+          </button>
+        </div>
+        <Separator.Root className="h-px bg-gray-4 mx-2" />
+        <div className="py-1 px-1">
+          <button className="flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg text-left hover:bg-gray-2 transition-colors">
+            <div className="w-7 h-7 rounded-md bg-gray-3 flex items-center justify-center text-gray-10">
+              <LogOut size={14} />
+            </div>
+            <span className="text-[13px] text-gray-11">Sign Out</span>
+          </button>
+        </div>
+      </div>
+    )}
+  </div>
+);
+
 // ─── NavV3 — main exported nav component ─────────────────────────────────────
 
 interface NavV3Props {
@@ -435,9 +492,10 @@ export const NavV3 = ({ appPickerInBranding = false, hubs, accountName }: NavV3P
               onClose={() => setOpenMenu(null)}
               defaultName={accountName}
             />
-            <div className="w-8 h-8 rounded-full flex items-center justify-center text-[16px] font-medium" style={{ background: BRAND_LIGHT, color: BRAND }}>
-              C
-            </div>
+            <UserAvatarDropdown
+              isOpen={openMenu === 'avatar'}
+              onToggle={() => toggle('avatar')}
+            />
           </>
         }
       >

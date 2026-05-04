@@ -2,14 +2,17 @@ import React, { useState, useRef, useCallback } from 'react';
 import {
   Users, Settings, LogOut, KeyRound, Plus, BookOpen,
   ArrowLeft, Search, MoreHorizontal, Pencil, Trash2,
+  ShieldCheck, ChevronDown, LayoutGrid, Archive, X, Check, UserMinus, Building2, Layers,
 } from 'lucide-react';
 import * as Separator from '@radix-ui/react-separator';
 import * as Tabs from '@radix-ui/react-tabs';
+import * as Dialog from '@radix-ui/react-dialog';
 import { cn } from '@/lib/utils';
 import { useTweakpane } from '@/lib/tweakpane';
 import {
   NavShell, HubGroup, AccountPicker, BRAND, BRAND_LIGHT,
   useOutsideClick, ShowIconsContext, ShowDescriptionsContext,
+  HexagonNodes,
 } from '../sgp-nav/SgpNav';
 import { GroupManagement, GroupFormDialog } from './GroupManagement';
 import { GroupDetail } from './GroupDetail';
@@ -97,9 +100,10 @@ interface GroupsTableViewProps {
   onSelectGroup: (id: string) => void;
   onRenameGroup: (id: string, name: string, description: string) => void;
   onDeleteGroup: (id: string) => void;
+  onCreateGroup?: () => void;
 }
 
-const GroupsTableView: React.FC<GroupsTableViewProps> = ({ groups, onSelectGroup, onRenameGroup, onDeleteGroup }) => {
+const GroupsTableView: React.FC<GroupsTableViewProps> = ({ groups, onSelectGroup, onRenameGroup, onDeleteGroup, onCreateGroup }) => {
   const [search, setSearch] = useState('');
   const [renameOpen, setRenameOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -112,8 +116,8 @@ const GroupsTableView: React.FC<GroupsTableViewProps> = ({ groups, onSelectGroup
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-6 py-3 border-b border-gray-4 shrink-0">
-        <div className="flex items-center gap-2 px-3 h-8 rounded-lg border border-gray-6 bg-white max-w-[320px]">
+      <div className="px-6 py-3 border-b border-gray-4 shrink-0 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 px-3 h-8 rounded-lg border border-gray-6 bg-white max-w-[320px] flex-1">
           <Search size={13} className="text-gray-8 shrink-0" />
           <input
             type="text"
@@ -123,6 +127,15 @@ const GroupsTableView: React.FC<GroupsTableViewProps> = ({ groups, onSelectGroup
             className="flex-1 bg-transparent text-[13px] text-gray-12 placeholder:text-gray-8 outline-none"
           />
         </div>
+        {onCreateGroup && (
+          <button
+            onClick={onCreateGroup}
+            className="h-8 px-3 rounded-lg text-[13px] font-medium text-white bg-[#5B5CE6] hover:bg-[#4A4BD5] transition-colors flex items-center gap-1.5 shrink-0"
+          >
+            <Plus size={14} />
+            New Group
+          </button>
+        )}
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto">
         {filtered.length === 0 ? (
@@ -138,7 +151,6 @@ const GroupsTableView: React.FC<GroupsTableViewProps> = ({ groups, onSelectGroup
                   <th className="text-left text-[11px] font-medium text-gray-9 uppercase tracking-wider pb-2.5 pr-3">Name</th>
                   <th className="text-left text-[11px] font-medium text-gray-9 uppercase tracking-wider pb-2.5 pr-3 w-[100px]">Members</th>
                   <th className="text-left text-[11px] font-medium text-gray-9 uppercase tracking-wider pb-2.5 pr-3 w-[100px]">Access</th>
-                  <th className="text-left text-[11px] font-medium text-gray-9 uppercase tracking-wider pb-2.5 w-[120px]">Created</th>
                   <th className="w-[40px]" />
                 </tr>
               </thead>
@@ -162,9 +174,6 @@ const GroupsTableView: React.FC<GroupsTableViewProps> = ({ groups, onSelectGroup
                       <span className="text-[13px] text-gray-11">
                         {group.accessBindings.length} binding{group.accessBindings.length !== 1 ? 's' : ''}
                       </span>
-                    </td>
-                    <td className="py-3">
-                      <span className="text-[12px] text-gray-9">{group.createdAt}</span>
                     </td>
                     <td className="py-3">
                       <DropdownMenu.Root>
@@ -268,9 +277,642 @@ const GroupsTableView: React.FC<GroupsTableViewProps> = ({ groups, onSelectGroup
   );
 };
 
-// ─── Management Shell (Full-Page Panel) ───────────────────────────────────────
+// ─── Org / Tenant shared types & mock data ────────────────────────────────────
 
-type ManagementView = 'groups' | 'roles' | 'users';
+type ManagementView = 'groups' | 'roles' | 'users' | 'org-members';
+
+interface Tenant { id: string; name: string; }
+interface Org    { id: string; name: string; }
+
+type OrgMemberStatus = 'active' | 'pending' | 'inactive';
+
+interface OrgMember {
+  id: string; name: string; email: string; initials: string;
+  role: 'member' | 'admin';
+  status: OrgMemberStatus;
+  tenantIds: string[];
+}
+
+const INITIAL_TENANTS: Tenant[] = [
+  { id: 't1', name: 'tenant name' },
+  { id: 't2', name: 'Second Tenant' },
+];
+
+const INITIAL_ORGS: Org[] = [
+  { id: 'o1', name: 'Acme Org' },
+  { id: 'o2', name: 'Beta Org' },
+];
+
+const MOCK_ORG_MEMBERS: Record<string, OrgMember[]> = {
+  o1: [
+    { id: 'u1', name: 'Alice Smith',  email: 'alice@acme.com',  initials: 'AS', role: 'admin',  status: 'active',   tenantIds: ['t1'] },
+    { id: 'u2', name: 'Bob Jones',    email: 'bob@acme.com',    initials: 'BJ', role: 'member', status: 'active',   tenantIds: ['t1', 't2'] },
+    { id: 'u3', name: 'Carol White',  email: 'carol@acme.com',  initials: 'CW', role: 'member', status: 'pending',  tenantIds: [] },
+    { id: 'u4', name: 'David Lee',    email: 'david@acme.com',  initials: 'DL', role: 'member', status: 'inactive', tenantIds: ['t2'] },
+  ],
+  o2: [
+    { id: 'u5', name: 'Eve Wilson',   email: 'eve@beta.com',    initials: 'EW', role: 'admin',  status: 'active',  tenantIds: ['t1', 't2'] },
+    { id: 'u6', name: 'Frank Brown',  email: 'frank@beta.com',  initials: 'FB', role: 'member', status: 'pending', tenantIds: ['t2'] },
+  ],
+};
+
+// ─── Org Members View ─────────────────────────────────────────────────────────
+
+const AVATAR_PALETTES_ORG = [
+  { bg: 'bg-[#E8E8FD]', text: 'text-[#5B5CE6]' },
+  { bg: 'bg-[#DDF3E4]', text: 'text-[#18794E]' },
+  { bg: 'bg-[#FEF2D6]', text: 'text-[#AD5700]' },
+  { bg: 'bg-[#FFE8D7]', text: 'text-[#BD4B00]' },
+  { bg: 'bg-[#FFE5E5]', text: 'text-[#CD2B31]' },
+] as const;
+
+function hashStr(s: string) {
+  let h = 0; for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0; return Math.abs(h);
+}
+
+// ─── Invite Org Members Dialog ────────────────────────────────────────────────
+
+const InviteOrgMembersDialog: React.FC<{
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onInvite: (invites: { email: string; role: 'member' | 'admin' }[]) => void;
+}> = ({ open, onOpenChange, onInvite }) => {
+  const [emailInput, setEmailInput] = useState('');
+  const [role, setRole] = useState<'member' | 'admin'>('member');
+
+  const parseEmails = (raw: string) =>
+    raw.split(',').map(e => e.trim()).filter(e => e.includes('@') && e.includes('.'));
+
+  const validEmails = parseEmails(emailInput);
+  const canSubmit = validEmails.length > 0;
+
+  const handleSubmit = () => {
+    onInvite(validEmails.map(email => ({ email, role })));
+    setEmailInput('');
+    setRole('member');
+    onOpenChange(false);
+  };
+
+  const reset = () => { setEmailInput(''); setRole('member'); };
+
+  return (
+    <Dialog.Root open={open} onOpenChange={v => { if (!v) reset(); onOpenChange(v); }}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 bg-black/40 z-50 animate-in fade-in duration-150" />
+        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl z-50 w-[480px] animate-in fade-in slide-in-from-bottom-2 duration-200 focus:outline-none">
+          {/* Header */}
+          <div className="px-6 pt-6 pb-5 border-b border-gray-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <Dialog.Title className="text-[16px] font-semibold text-gray-12">Invite to Org</Dialog.Title>
+                <Dialog.Description className="text-[13px] text-gray-9 mt-0.5">
+                  Enter one or more emails separated by commas.
+                </Dialog.Description>
+              </div>
+              <Dialog.Close asChild>
+                <button className="w-7 h-7 rounded-md flex items-center justify-center text-gray-8 hover:bg-gray-3 hover:text-gray-11 transition-colors -mr-1 -mt-1">
+                  <X size={16} />
+                </button>
+              </Dialog.Close>
+            </div>
+          </div>
+
+          {/* Input + role */}
+          <div className="px-6 py-5">
+            <div className="flex items-center gap-2">
+              <div className="flex-1 flex items-center px-3 h-9 rounded-lg border border-gray-6 bg-white">
+                <input
+                  autoFocus
+                  type="text"
+                  value={emailInput}
+                  onChange={e => setEmailInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && canSubmit && handleSubmit()}
+                  placeholder="alice@co.com, bob@co.com..."
+                  className="flex-1 bg-transparent text-[13px] text-gray-12 placeholder:text-gray-8 outline-none min-w-0"
+                />
+              </div>
+              <DropdownMenu.Root>
+                <DropdownMenu.Trigger asChild>
+                  <button className="flex items-center gap-1 h-9 px-3 rounded-lg border border-gray-6 bg-white text-[13px] font-medium text-gray-11 hover:bg-gray-2 transition-colors capitalize whitespace-nowrap shrink-0">
+                    {role} <ChevronDown size={12} className="text-gray-8" />
+                  </button>
+                </DropdownMenu.Trigger>
+                <DropdownMenu.Portal>
+                  <DropdownMenu.Content align="end" sideOffset={4} className="bg-white rounded-lg shadow-xl border border-gray-5 py-1 w-[120px] z-[60] animate-in fade-in slide-in-from-top-1 duration-150">
+                    {(['member', 'admin'] as const).map(r => (
+                      <DropdownMenu.Item
+                        key={r}
+                        onClick={() => setRole(r)}
+                        className={cn('flex items-center justify-between px-3 py-1.5 text-[13px] cursor-pointer outline-none transition-colors capitalize',
+                          r === role ? 'text-[#5B5CE6] bg-[#0011FF08]' : 'text-gray-11 hover:bg-[#0011FF0F] hover:text-[#2E1E71]'
+                        )}
+                      >
+                        {r} {r === role && <Check size={12} className="text-[#5B5CE6]" />}
+                      </DropdownMenu.Item>
+                    ))}
+                  </DropdownMenu.Content>
+                </DropdownMenu.Portal>
+              </DropdownMenu.Root>
+            </div>
+            {validEmails.length > 1 && (
+              <p className="mt-2 text-[11px] text-gray-9">{validEmails.length} addresses detected</p>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="px-6 py-4 border-t border-gray-4 flex items-center justify-end gap-2">
+            <Dialog.Close asChild>
+              <button className="h-8 px-3 rounded-lg text-[13px] font-medium text-gray-11 hover:bg-gray-3 transition-colors">Cancel</button>
+            </Dialog.Close>
+            <button
+              disabled={!canSubmit}
+              onClick={handleSubmit}
+              className="h-8 px-4 rounded-lg text-[13px] font-medium text-white bg-[#5B5CE6] hover:bg-[#4A4BD5] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Send {canSubmit ? `${validEmails.length} ` : ''}Invite{validEmails.length !== 1 ? 's' : ''}
+            </button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+};
+
+const OrgMemberStatusBadge: React.FC<{ status: OrgMemberStatus }> = ({ status }) => {
+  const styles: Record<OrgMemberStatus, { pill: string; dot: string }> = {
+    active:   { pill: 'bg-green-3 text-green-11', dot: 'bg-green-9' },
+    pending:  { pill: 'bg-amber-3 text-amber-11', dot: 'bg-amber-9' },
+    inactive: { pill: 'bg-gray-3 text-gray-10',   dot: 'bg-gray-8'  },
+  };
+  const s = styles[status];
+  return (
+    <span className={cn('inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium', s.pill)}>
+      <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', s.dot)} />
+      {status.charAt(0).toUpperCase() + status.slice(1)}
+    </span>
+  );
+};
+
+interface OrgMembersViewProps {
+  orgId: string;
+  tenants: Tenant[];
+  onNavigateToTenantUsers: (tenantId: string) => void;
+}
+
+const OrgMembersView: React.FC<OrgMembersViewProps> = ({ orgId, tenants, onNavigateToTenantUsers }) => {
+  const [members, setMembers] = useState<OrgMember[]>(MOCK_ORG_MEMBERS[orgId] ?? []);
+  const [search, setSearch] = useState('');
+  const [inviteOpen, setInviteOpen] = useState(false);
+
+  const filtered = members.filter(m =>
+    m.name.toLowerCase().includes(search.toLowerCase()) ||
+    m.email.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const handleRoleChange = (memberId: string, role: 'member' | 'admin') =>
+    setMembers(prev => prev.map(m => m.id === memberId ? { ...m, role } : m));
+
+  const handleRemove = (memberId: string) =>
+    setMembers(prev => prev.filter(m => m.id !== memberId));
+
+  const handleInvite = (invites: { email: string; role: 'member' | 'admin' }[]) => {
+    const newMembers: OrgMember[] = invites.map((inv, i) => {
+      const parts = inv.email.split('@')[0].split('.');
+      const name = parts.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+      const initials = parts.map(p => p.charAt(0).toUpperCase()).join('').slice(0, 2);
+      return {
+        id: `inv-${Date.now()}-${i}`, name, email: inv.email,
+        initials, role: inv.role, status: 'pending' as OrgMemberStatus, tenantIds: [],
+      };
+    });
+    setMembers(prev => [...prev, ...newMembers]);
+  };
+
+  const tenantName = (id: string) => tenants.find(t => t.id === id)?.name ?? id;
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="px-6 py-3 border-b border-gray-4 shrink-0 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 px-3 h-8 rounded-lg border border-gray-6 bg-white max-w-[320px] flex-1">
+          <Search size={13} className="text-gray-8 shrink-0" />
+          <input
+            type="text"
+            placeholder="Search members..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="flex-1 bg-transparent text-[13px] text-gray-12 placeholder:text-gray-8 outline-none"
+          />
+        </div>
+        <button
+          onClick={() => setInviteOpen(true)}
+          className="h-8 px-3 rounded-lg text-[13px] font-medium text-white bg-[#5B5CE6] hover:bg-[#4A4BD5] transition-colors flex items-center gap-1.5 shrink-0"
+        >
+          <Plus size={14} /> Add Member
+        </button>
+      </div>
+
+      <InviteOrgMembersDialog open={inviteOpen} onOpenChange={setInviteOpen} onInvite={handleInvite} />
+
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        {filtered.length === 0 ? (
+          <div className="px-6 py-12 text-center">
+            <Users size={28} className="text-gray-6 mx-auto mb-3" />
+            <p className="text-[13px] text-gray-9">{search ? 'No members match your search' : 'No members yet'}</p>
+          </div>
+        ) : (
+          <div className="px-6 py-3">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-4">
+                  <th className="text-left text-[11px] font-medium text-gray-9 uppercase tracking-wider pb-2.5 pr-3">Member</th>
+                  <th className="text-left text-[11px] font-medium text-gray-9 uppercase tracking-wider pb-2.5 pr-3 w-[100px]">Status</th>
+                  <th className="text-left text-[11px] font-medium text-gray-9 uppercase tracking-wider pb-2.5 pr-3 w-[110px]">Role</th>
+                  <th className="text-left text-[11px] font-medium text-gray-9 uppercase tracking-wider pb-2.5">Tenants</th>
+                  <th className="w-[40px]" />
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(member => {
+                  const palette = AVATAR_PALETTES_ORG[hashStr(member.name) % AVATAR_PALETTES_ORG.length];
+                  return (
+                    <tr key={member.id} className="border-b border-gray-3 last:border-b-0 group">
+                      <td className="py-2.5 pr-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className={cn('w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-medium shrink-0', palette.bg, palette.text)}>
+                            {member.initials}
+                          </div>
+                          <div>
+                            <p className="text-[13px] font-medium text-gray-12">{member.name}</p>
+                            <p className="text-[11px] text-gray-9">{member.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-2.5 pr-3">
+                        <OrgMemberStatusBadge status={member.status} />
+                      </td>
+                      <td className="py-2.5 pr-3">
+                        <DropdownMenu.Root>
+                          <DropdownMenu.Trigger asChild>
+                            <button className="flex items-center gap-1 px-2 py-1 rounded-md text-[12px] font-medium text-gray-10 hover:bg-gray-3 transition-colors capitalize">
+                              {member.role} <ChevronDown size={11} className="text-gray-8" />
+                            </button>
+                          </DropdownMenu.Trigger>
+                          <DropdownMenu.Portal>
+                            <DropdownMenu.Content align="start" sideOffset={4} className="bg-white rounded-lg shadow-xl border border-gray-5 py-1 w-[120px] z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                              {(['member', 'admin'] as const).map(r => (
+                                <DropdownMenu.Item
+                                  key={r}
+                                  onClick={() => handleRoleChange(member.id, r)}
+                                  className={cn('flex items-center justify-between px-3 py-1.5 text-[13px] cursor-pointer outline-none transition-colors capitalize',
+                                    r === member.role ? 'text-[#5B5CE6] bg-[#0011FF08]' : 'text-gray-11 hover:bg-[#0011FF0F] hover:text-[#2E1E71]'
+                                  )}
+                                >
+                                  {r}
+                                  {r === member.role && <Check size={12} className="text-[#5B5CE6]" />}
+                                </DropdownMenu.Item>
+                              ))}
+                            </DropdownMenu.Content>
+                          </DropdownMenu.Portal>
+                        </DropdownMenu.Root>
+                      </td>
+                      <td className="py-2.5">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          {member.tenantIds.length === 0 ? (
+                            <span className="text-[12px] text-gray-8 italic">No tenants</span>
+                          ) : member.tenantIds.map(tid => (
+                            <button
+                              key={tid}
+                              onClick={() => onNavigateToTenantUsers(tid)}
+                              className="text-[11px] text-[#5B5CE6] hover:underline transition-colors cursor-pointer"
+                            >
+                              {tenantName(tid)}
+                            </button>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="py-2.5">
+                        <DropdownMenu.Root>
+                          <DropdownMenu.Trigger asChild>
+                            <button className="w-7 h-7 rounded-md flex items-center justify-center text-gray-8 opacity-0 group-hover:opacity-100 hover:bg-gray-3 hover:text-gray-11 transition-all">
+                              <MoreHorizontal size={14} />
+                            </button>
+                          </DropdownMenu.Trigger>
+                          <DropdownMenu.Portal>
+                            <DropdownMenu.Content align="end" sideOffset={4} className="bg-white rounded-lg shadow-xl border border-gray-5 py-1 w-[160px] z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                              <DropdownMenu.Item
+                                onClick={() => handleRemove(member.id)}
+                                className="flex items-center gap-2 px-3 py-1.5 text-[13px] text-gray-11 hover:bg-gray-2 cursor-pointer outline-none transition-colors"
+                              >
+                                Deactivate User
+                              </DropdownMenu.Item>
+                              <DropdownMenu.Item
+                                onClick={() => handleRemove(member.id)}
+                                className="flex items-center gap-2 px-3 py-1.5 text-[13px] text-red-10 hover:bg-red-2 cursor-pointer outline-none transition-colors"
+                              >
+                                Remove User
+                              </DropdownMenu.Item>
+                            </DropdownMenu.Content>
+                          </DropdownMenu.Portal>
+                        </DropdownMenu.Root>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ─── Control Plane Left Sidebar ───────────────────────────────────────────────
+
+interface ControlPlaneLeftSidebarProps {
+  activeView: ManagementView;
+  activeOrgId: string | null;
+  onSetActiveView: (v: ManagementView) => void;
+  onNavigateOrg: (orgId: string) => void;
+  showUsers: boolean;
+  tenants: Tenant[];
+  onUpdateTenants: (tenants: Tenant[]) => void;
+  isAdmin: boolean;
+}
+
+const ControlPlaneLeftSidebar: React.FC<ControlPlaneLeftSidebarProps> = ({ activeView, activeOrgId, onSetActiveView, onNavigateOrg, showUsers, tenants, onUpdateTenants, isAdmin }) => {
+  const [orgs, setOrgs] = useState<Org[]>(INITIAL_ORGS);
+  const [activeTenantId, setActiveTenantId] = useState('t1');
+  const [openAccordions, setOpenAccordions] = useState<Set<string>>(new Set(['t1', 'o1']));
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+
+  // Dialog — shared for both orgs and tenants
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogMode, setDialogMode] = useState<'create' | 'rename'>('create');
+  const [dialogEntityType, setDialogEntityType] = useState<'org' | 'tenant'>('tenant');
+  const [dialogTargetId, setDialogTargetId] = useState<string | null>(null);
+  const [dialogName, setDialogName] = useState('');
+
+  // Archive confirm — shared
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [archiveEntityType, setArchiveEntityType] = useState<'org' | 'tenant'>('tenant');
+  const [archiveTargetId, setArchiveTargetId] = useState<string | null>(null);
+
+  const tenantNavItems: { value: ManagementView; label: string; Icon: React.ElementType }[] = [
+    ...(showUsers ? [{ value: 'users' as ManagementView, label: 'Users', Icon: Users }] : []),
+    { value: 'groups', label: 'Groups', Icon: LayoutGrid },
+    { value: 'roles', label: 'Roles', Icon: ShieldCheck },
+  ];
+
+  const toggleAccordion = (id: string) =>
+    setOpenAccordions(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const openDialog = (entityType: 'org' | 'tenant', mode: 'create' | 'rename', targetId?: string) => {
+    setDialogEntityType(entityType);
+    setDialogMode(mode);
+    setDialogTargetId(targetId ?? null);
+    const list = entityType === 'tenant' ? tenants : orgs;
+    setDialogName(mode === 'rename' ? (list.find(e => e.id === targetId)?.name ?? '') : '');
+    setDialogOpen(true);
+  };
+
+  const handleDialogSubmit = () => {
+    if (!dialogName.trim()) return;
+    const name = dialogName.trim();
+    if (dialogEntityType === 'tenant') {
+      if (dialogMode === 'create') {
+        const id = `t${Date.now()}`;
+        onUpdateTenants([...tenants, { id, name }]);
+        setActiveTenantId(id);
+        setOpenAccordions(prev => new Set([...prev, id]));
+      } else if (dialogTargetId) {
+        onUpdateTenants(tenants.map(t => t.id === dialogTargetId ? { ...t, name } : t));
+      }
+    } else {
+      if (dialogMode === 'create') {
+        const id = `o${Date.now()}`;
+        setOrgs(prev => [...prev, { id, name }]);
+        setOpenAccordions(prev => new Set([...prev, id]));
+      } else if (dialogTargetId) {
+        setOrgs(prev => prev.map(o => o.id === dialogTargetId ? { ...o, name } : o));
+      }
+    }
+    setDialogOpen(false);
+  };
+
+  const openArchiveConfirm = (entityType: 'org' | 'tenant', id: string) => {
+    setArchiveEntityType(entityType); setArchiveTargetId(id); setArchiveOpen(true);
+  };
+
+  const handleArchive = () => {
+    if (archiveEntityType === 'tenant') {
+      const remaining = tenants.filter(t => t.id !== archiveTargetId);
+      onUpdateTenants(remaining);
+      if (activeTenantId === archiveTargetId) setActiveTenantId(remaining[0]?.id ?? '');
+    } else {
+      setOrgs(prev => prev.filter(o => o.id !== archiveTargetId));
+    }
+    setArchiveOpen(false);
+  };
+
+  const archiveTargetName = archiveEntityType === 'tenant'
+    ? tenants.find(t => t.id === archiveTargetId)?.name
+    : orgs.find(o => o.id === archiveTargetId)?.name;
+
+  const renderTenantNavItems = (tenantId: string) => (
+    <div className="pl-2 mt-0.5 space-y-0.5 border-l border-gray-5 ml-3">
+      {tenantNavItems.map(({ value, label, Icon }) => (
+        <button
+          key={value}
+          onClick={() => { setActiveTenantId(tenantId); onSetActiveView(value); }}
+          className={cn(
+            'w-full flex items-center gap-2.5 px-2 py-1 rounded-md text-[13px] font-medium transition-colors text-left',
+            activeTenantId === tenantId && activeView === value
+              ? 'bg-[#EEEEFF] text-[#5B5CE6]'
+              : 'text-gray-10 hover:bg-gray-2 hover:text-gray-12',
+          )}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+
+  const renderOrgNavItems = (orgId: string) => (
+    <div className="pl-2 mt-0.5 border-l border-gray-5 ml-3">
+      <button
+        onClick={() => onNavigateOrg(orgId)}
+          className={cn(
+          'w-full flex items-center gap-2.5 px-2 py-1 rounded-md text-[13px] font-medium transition-colors text-left',
+          activeOrgId === orgId && activeView === 'org-members'
+            ? 'bg-[#EEEEFF] text-[#5B5CE6]'
+            : 'text-gray-10 hover:bg-gray-2 hover:text-gray-12',
+        )}
+      >
+        Members
+      </button>
+    </div>
+  );
+
+  const renderEntityRow = (entity: Tenant | Org, entityType: 'org' | 'tenant', readonly = false) => {
+    const menuId = `${entityType}-${entity.id}`;
+    const newLabel = entityType === 'tenant' ? 'New Tenant' : 'New Org';
+    return (
+      <div key={entity.id} className="mb-0.5">
+        <div className="group/entity flex items-center">
+          <button
+            onClick={() => {
+              toggleAccordion(entity.id);
+              if (entityType === 'tenant') setActiveTenantId(entity.id);
+            }}
+            className="flex-1 flex items-center gap-2 px-2 py-1 rounded-md hover:bg-gray-2 transition-colors min-w-0"
+          >
+            <ChevronDown size={13} className={cn('text-gray-7 shrink-0 transition-transform duration-150', !openAccordions.has(entity.id) && '-rotate-90')} />
+            <span className="text-[13px] font-medium text-gray-11 truncate">{entity.name}</span>
+          </button>
+          {!readonly && (
+          <DropdownMenu.Root open={menuOpenId === menuId} onOpenChange={open => setMenuOpenId(open ? menuId : null)}>
+            <DropdownMenu.Trigger asChild>
+              <button className="w-6 h-6 rounded flex items-center justify-center text-gray-8 opacity-0 group-hover/entity:opacity-100 data-[state=open]:opacity-100 hover:bg-gray-3 transition-all mr-1 shrink-0">
+                <MoreHorizontal size={14} />
+              </button>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content align="start" sideOffset={4} className="bg-white rounded-lg shadow-xl border border-gray-5 py-1 w-[150px] z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                <DropdownMenu.Item onClick={() => openDialog(entityType, 'rename', entity.id)} className="flex items-center gap-2 px-3 py-1.5 text-[13px] text-gray-11 hover:bg-[#0011FF0F] hover:text-[#2E1E71] cursor-pointer outline-none transition-colors">
+                  Rename
+                </DropdownMenu.Item>
+                <DropdownMenu.Item onClick={() => openArchiveConfirm(entityType, entity.id)} className="flex items-center gap-2 px-3 py-1.5 text-[13px] text-gray-11 hover:bg-red-2 hover:text-red-10 cursor-pointer outline-none transition-colors">
+                  Archive
+                </DropdownMenu.Item>
+                <DropdownMenu.Separator className="h-px bg-gray-4 my-1" />
+                <DropdownMenu.Item onClick={() => openDialog(entityType, 'create')} className="flex items-center gap-2 px-3 py-1.5 text-[13px] text-gray-11 hover:bg-[#0011FF0F] hover:text-[#2E1E71] cursor-pointer outline-none transition-colors">
+                  <Plus size={13} /> {newLabel}
+                </DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
+          )}
+        </div>
+        {openAccordions.has(entity.id) && (
+          entityType === 'tenant' ? renderTenantNavItems(entity.id) : renderOrgNavItems(entity.id)
+        )}
+      </div>
+    );
+  };
+
+  const SectionHeader: React.FC<{ label: string; icon: React.ReactNode; onAdd?: () => void; mt?: boolean }> = ({ label, icon, onAdd, mt }) => (
+    <div className={cn('flex items-center justify-between pl-2 py-1 mb-0.5', mt && 'mt-3')}>
+      <div className="flex items-center gap-1.5 text-gray-8">
+        {icon}
+        <span className="text-[10px] font-semibold uppercase tracking-wider">{label}</span>
+      </div>
+      {onAdd && (
+        <button onClick={onAdd} className="w-6 h-6 rounded flex items-center justify-center text-gray-7 hover:bg-gray-3 hover:text-gray-12 transition-colors mr-1 shrink-0">
+          <Plus size={12} />
+        </button>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="w-[200px] h-full flex flex-col bg-white border-r border-gray-4 shrink-0">
+      {/* Logo */}
+      <div className="px-4 py-4 flex items-center gap-2.5 shrink-0">
+        <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, rgb(59, 130, 246) 0%, rgb(139, 92, 246) 50%, rgb(59, 130, 246) 100%)' }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L13.09 8.26L16 6L14.74 9.74L20 8L16.74 11.09L22 12L16.74 12.91L20 16L14.74 14.26L16 18L13.09 15.74L12 22L10.91 15.74L8 18L9.26 14.26L4 16L7.26 12.91L2 12L7.26 11.09L4 8L9.26 9.74L8 6L10.91 8.26L12 2Z" fill="white" />
+          </svg>
+        </div>
+        <span className="text-[14px] font-semibold text-gray-12">Control Plane</span>
+      </div>
+
+      {/* Nav */}
+      <nav className="flex-1 px-3 py-1 overflow-y-auto">
+        {isAdmin && (
+          <>
+            <SectionHeader label="Orgs" icon={<Building2 size={11} />} onAdd={() => openDialog('org', 'create')} />
+            {orgs.map(org => renderEntityRow(org, 'org'))}
+          </>
+        )}
+        <SectionHeader label="Tenants" icon={<Layers size={11} />} onAdd={isAdmin ? () => openDialog('tenant', 'create') : undefined} mt={isAdmin} />
+        {tenants.map(tenant => renderEntityRow(tenant, 'tenant', !isAdmin))}
+      </nav>
+
+      {/* User footer */}
+      <div className="px-3 py-3 border-t border-gray-4 shrink-0">
+        <div className="flex items-center gap-2.5 px-2 py-1">
+          <div className="w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-medium shrink-0" style={{ background: BRAND_LIGHT, color: BRAND }}>C</div>
+          <div className="min-w-0">
+            <p className="text-[12px] font-medium text-gray-12 truncate">César Neri</p>
+            <p className="text-[11px] text-gray-9 truncate">cesar.neri@scale.com</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Create / Rename dialog */}
+      <Dialog.Root open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/40 z-50 animate-in fade-in duration-150" />
+          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl z-50 w-[360px] p-6 animate-in fade-in slide-in-from-bottom-2 duration-200 focus:outline-none">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <Dialog.Title className="text-[16px] font-semibold text-gray-12">
+                  {dialogMode === 'create' ? `New ${dialogEntityType === 'org' ? 'Org' : 'Tenant'}` : `Rename ${dialogEntityType === 'org' ? 'Org' : 'Tenant'}`}
+                </Dialog.Title>
+                <Dialog.Description className="text-[13px] text-gray-9 mt-0.5">
+                  {dialogMode === 'create' ? `Enter a name for the new ${dialogEntityType}.` : `Enter a new name.`}
+                </Dialog.Description>
+              </div>
+              <Dialog.Close asChild>
+                <button className="w-7 h-7 rounded-md flex items-center justify-center text-gray-8 hover:bg-gray-3 hover:text-gray-11 transition-colors -mr-1 -mt-1"><X size={16} /></button>
+              </Dialog.Close>
+            </div>
+            <input
+              autoFocus
+              value={dialogName}
+              onChange={e => setDialogName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleDialogSubmit(); }}
+              placeholder={`${dialogEntityType === 'org' ? 'Org' : 'Tenant'} name`}
+              className="w-full h-9 px-3 rounded-lg border border-gray-6 text-[13px] text-gray-12 placeholder:text-gray-8 outline-none focus:border-[#5B5CE6] transition-colors"
+            />
+            <div className="flex items-center justify-end gap-2 mt-4">
+              <Dialog.Close asChild>
+                <button className="h-8 px-3 rounded-lg text-[13px] font-medium text-gray-11 hover:bg-gray-3 transition-colors">Cancel</button>
+              </Dialog.Close>
+              <button disabled={!dialogName.trim()} onClick={handleDialogSubmit} className="h-8 px-4 rounded-lg text-[13px] font-medium text-white bg-[#5B5CE6] hover:bg-[#4A4BD5] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                {dialogMode === 'create' ? 'Create' : 'Rename'}
+              </button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      {/* Archive confirmation */}
+      <AlertDialog.Root open={archiveOpen} onOpenChange={setArchiveOpen}>
+        <AlertDialog.Portal>
+          <AlertDialog.Overlay className="fixed inset-0 bg-black/40 z-50 animate-in fade-in duration-150" />
+          <AlertDialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl z-50 w-[400px] p-6 animate-in fade-in slide-in-from-bottom-2 duration-200 focus:outline-none">
+            <AlertDialog.Title className="text-[16px] font-semibold text-gray-12">Archive "{archiveTargetName}"?</AlertDialog.Title>
+            <AlertDialog.Description className="text-[13px] text-gray-10 mt-2 leading-relaxed">
+              This {archiveEntityType} will be archived and removed from the sidebar.
+            </AlertDialog.Description>
+            <div className="flex items-center justify-end gap-2 mt-5">
+              <AlertDialog.Cancel asChild>
+                <button className="h-8 px-3 rounded-lg text-[13px] font-medium text-gray-11 hover:bg-gray-3 transition-colors">Cancel</button>
+              </AlertDialog.Cancel>
+              <AlertDialog.Action asChild>
+                <button onClick={handleArchive} className="h-8 px-4 rounded-lg text-[13px] font-medium text-white bg-red-9 hover:bg-red-10 transition-colors">Archive</button>
+              </AlertDialog.Action>
+            </div>
+          </AlertDialog.Content>
+        </AlertDialog.Portal>
+      </AlertDialog.Root>
+    </div>
+  );
+};
+
+// ─── Management Shell (Full-Page Panel) ───────────────────────────────────────
 
 type GroupsLayout = 'sidebar' | 'full-page';
 
@@ -279,10 +921,16 @@ interface ManagementPanelProps {
   onUpdateGroups: (groups: Group[]) => void;
   showUsers: boolean;
   groupsLayout: GroupsLayout;
+  activeView: ManagementView;
+  onSetActiveView: (v: ManagementView) => void;
+  hideHeader?: boolean;
+  activeOrgId: string | null;
+  tenants: Tenant[];
+  onNavigateToTenantUsers: (tenantId: string) => void;
+  isAdmin?: boolean;
 }
 
-const ManagementPanel: React.FC<ManagementPanelProps> = ({ groups, onUpdateGroups, showUsers, groupsLayout }) => {
-  const [activeView, setActiveView] = useState<ManagementView>('groups');
+const ManagementPanel: React.FC<ManagementPanelProps> = ({ groups, onUpdateGroups, showUsers, groupsLayout, activeView, onSetActiveView, hideHeader, activeOrgId, tenants, onNavigateToTenantUsers, isAdmin }) => {
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(
     groupsLayout === 'sidebar' ? (groups[0]?.id ?? null) : null
   );
@@ -290,8 +938,8 @@ const ManagementPanel: React.FC<ManagementPanelProps> = ({ groups, onUpdateGroup
   const [editOpen, setEditOpen] = useState(false);
 
   React.useEffect(() => {
-    if (!showUsers && activeView === 'users') setActiveView('groups');
-  }, [showUsers, activeView]);
+    if (!showUsers && activeView === 'users') onSetActiveView('groups');
+  }, [showUsers, activeView, onSetActiveView]);
 
   const selectedGroup = groups.find(g => g.id === selectedGroupId) ?? null;
 
@@ -336,63 +984,67 @@ const ManagementPanel: React.FC<ManagementPanelProps> = ({ groups, onUpdateGroup
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-gray-1">
       {/* Page header */}
-      <div className="bg-white shrink-0">
-        <div className="px-6 pt-5 pb-3 flex items-center justify-between">
-          <div>
-            <h1 className="text-[20px] font-semibold text-gray-12">Access Management</h1>
-            <p className="text-[13px] text-gray-9 mt-0.5">Manage groups, roles, and user access for your tenant.</p>
+      {!hideHeader && (
+        <div className="bg-white shrink-0">
+          <div className="px-6 pt-5 pb-3 flex items-center justify-between">
+            <div>
+              <h1 className="text-[20px] font-semibold text-gray-12">Access Management</h1>
+              <p className="text-[13px] text-gray-9 mt-0.5">Manage groups, roles, and user access for your tenant.</p>
+            </div>
+            <div className="flex items-center gap-2" />
           </div>
-          <div className="flex items-center gap-2">
-            {activeView === 'groups' && groupsLayout === 'full-page' && !selectedGroupId && (
-              <button
-                onClick={() => setCreateOpen(true)}
-                className="h-8 px-3 rounded-lg text-[13px] font-medium text-white bg-[#5B5CE6] hover:bg-[#4A4BD5] transition-colors flex items-center gap-1.5"
-              >
-                <Plus size={14} />
-                New Group
-              </button>
-            )}
-          </div>
-        </div>
-        <div className="px-6 border-b border-gray-4">
-          <Tabs.Root value={activeView} onValueChange={(v) => setActiveView(v as ManagementView)}>
-            <Tabs.List className="flex items-center gap-0">
-              {showUsers && (
+          <div className="px-6 border-b border-gray-4">
+            <Tabs.Root value={activeView} onValueChange={(v) => onSetActiveView(v as ManagementView)}>
+              <Tabs.List className="flex items-center gap-0">
+                {showUsers && (
+                  <Tabs.Trigger
+                    value="users"
+                    className={cn(
+                      'px-3 py-2 text-[13px] font-medium transition-colors border-b-2 -mb-px',
+                      'data-[state=active]:text-[#5B5CE6] data-[state=active]:border-[#5B5CE6]',
+                      'data-[state=inactive]:text-gray-9 data-[state=inactive]:border-transparent data-[state=inactive]:hover:text-gray-11',
+                    )}
+                  >
+                    Users
+                  </Tabs.Trigger>
+                )}
                 <Tabs.Trigger
-                  value="users"
+                  value="groups"
                   className={cn(
                     'px-3 py-2 text-[13px] font-medium transition-colors border-b-2 -mb-px',
                     'data-[state=active]:text-[#5B5CE6] data-[state=active]:border-[#5B5CE6]',
                     'data-[state=inactive]:text-gray-9 data-[state=inactive]:border-transparent data-[state=inactive]:hover:text-gray-11',
                   )}
                 >
-                  Users
+                  Groups
                 </Tabs.Trigger>
-              )}
-              <Tabs.Trigger
-                value="groups"
-                className={cn(
-                  'px-3 py-2 text-[13px] font-medium transition-colors border-b-2 -mb-px',
-                  'data-[state=active]:text-[#5B5CE6] data-[state=active]:border-[#5B5CE6]',
-                  'data-[state=inactive]:text-gray-9 data-[state=inactive]:border-transparent data-[state=inactive]:hover:text-gray-11',
-                )}
-              >
-                Groups
-              </Tabs.Trigger>
-              <Tabs.Trigger
-                value="roles"
-                className={cn(
-                  'px-3 py-2 text-[13px] font-medium transition-colors border-b-2 -mb-px',
-                  'data-[state=active]:text-[#5B5CE6] data-[state=active]:border-[#5B5CE6]',
-                  'data-[state=inactive]:text-gray-9 data-[state=inactive]:border-transparent data-[state=inactive]:hover:text-gray-11',
-                )}
-              >
-                Roles
-              </Tabs.Trigger>
-            </Tabs.List>
-          </Tabs.Root>
+                <Tabs.Trigger
+                  value="roles"
+                  className={cn(
+                    'px-3 py-2 text-[13px] font-medium transition-colors border-b-2 -mb-px',
+                    'data-[state=active]:text-[#5B5CE6] data-[state=active]:border-[#5B5CE6]',
+                    'data-[state=inactive]:text-gray-9 data-[state=inactive]:border-transparent data-[state=inactive]:hover:text-gray-11',
+                  )}
+                >
+                  Roles
+                </Tabs.Trigger>
+              </Tabs.List>
+            </Tabs.Root>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Left-panel title header */}
+      {hideHeader && (
+        <div className="bg-white px-6 py-4 shrink-0">
+          <h1 className="text-[20px] font-semibold text-gray-12">
+            {activeView === 'groups' ? 'Groups'
+              : activeView === 'users' ? 'Users'
+              : activeView === 'roles' ? 'Roles'
+              : 'Members'}
+          </h1>
+        </div>
+      )}
 
       {/* Main Content */}
       {activeView === 'groups' && groupsLayout === 'sidebar' && (
@@ -445,6 +1097,7 @@ const ManagementPanel: React.FC<ManagementPanelProps> = ({ groups, onUpdateGroup
               onSelectGroup={setSelectedGroupId}
               onRenameGroup={handleRenameGroup}
               onDeleteGroup={handleDeleteGroup}
+              onCreateGroup={() => setCreateOpen(true)}
             />
           )}
         </div>
@@ -454,9 +1107,14 @@ const ManagementPanel: React.FC<ManagementPanelProps> = ({ groups, onUpdateGroup
           <RoleReference />
         </div>
       )}
+      {activeView === 'org-members' && activeOrgId && (
+        <div className="flex-1 bg-white min-h-0">
+          <OrgMembersView orgId={activeOrgId} tenants={tenants} onNavigateToTenantUsers={onNavigateToTenantUsers} />
+        </div>
+      )}
       {activeView === 'users' && showUsers && (
         <div className="flex-1 bg-white min-h-0">
-          <UsersManagement onNavigateToGroup={handleNavigateToGroup} />
+          <UsersManagement onNavigateToGroup={handleNavigateToGroup} isAdmin={isAdmin} />
         </div>
       )}
 
@@ -486,11 +1144,14 @@ const ManagementPanel: React.FC<ManagementPanelProps> = ({ groups, onUpdateGroup
 
 const GroupRoleManagement: React.FC = () => {
   const { params } = useTweakpane(
-    { showUsersTab: true, groupsLayout: 'sidebar' },
-    { groupsLayout: { options: { 'Sidebar': 'sidebar', 'Full Page': 'full-page' } } },
+    { showUsersTab: true, navLayout: 'left-panel', isAdmin: true },
+    { navLayout: { options: { 'Top Nav': 'top-nav', 'Left Panel': 'left-panel' } } },
   );
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [groups, setGroups] = useState<Group[]>(INITIAL_GROUPS);
+  const [tenants, setTenants] = useState<Tenant[]>(INITIAL_TENANTS);
+  const [activeView, setActiveView] = useState<ManagementView>('groups');
+  const [activeOrgId, setActiveOrgId] = useState<string | null>(null);
   const navRef = useRef<HTMLDivElement>(null);
 
   const closeMenus = useCallback(() => setOpenMenu(null), []);
@@ -498,41 +1159,89 @@ const GroupRoleManagement: React.FC = () => {
 
   const toggle = (id: string) => setOpenMenu(p => (p === id ? null : id));
 
+  const isLeftPanel = params.navLayout === 'left-panel';
+  const showUsers = params.showUsersTab as boolean;
+  const groupsLayout: GroupsLayout = isLeftPanel ? 'full-page' : 'sidebar';
+
+  const handleNavigateToTenantUsers = (tenantId: string) => {
+    // In the sidebar, switch the active tenant accordion and navigate to users view
+    setActiveView('users');
+    // Tenant selection is managed inside the sidebar, so just switch the view
+    // The tenant name will be visible in the users page title eventually
+    void tenantId;
+  };
+
   return (
     <ShowIconsContext.Provider value={true}>
       <ShowDescriptionsContext.Provider value={true}>
-        <div className="min-h-screen bg-gray-2 flex flex-col">
-          {/* Navigation */}
-          <div ref={navRef} className="relative z-40 shrink-0">
-            <NavShell
-              rightSlot={
-                <>
-                  <AccountPicker
-                    isOpen={openMenu === 'account'}
-                    onToggle={() => toggle('account')}
-                    onClose={closeMenus}
-                  />
-                  <UserAvatarDropdown
-                    isOpen={openMenu === 'avatar'}
-                    onToggle={() => toggle('avatar')}
-                    onClose={closeMenus}
-                    onManageGroupsRoles={() => {}}
-                  />
-                </>
-              }
-            >
-              <HubGroup openMenu={openMenu} toggle={toggle} close={closeMenus} />
-            </NavShell>
+        {isLeftPanel ? (
+          <div className="h-screen flex overflow-hidden bg-gray-1">
+            <ControlPlaneLeftSidebar
+              activeView={activeView}
+              activeOrgId={activeOrgId}
+              onSetActiveView={setActiveView}
+              onNavigateOrg={(orgId) => { setActiveOrgId(orgId); setActiveView('org-members'); }}
+              showUsers={showUsers}
+              tenants={tenants}
+              onUpdateTenants={setTenants}
+              isAdmin={params.isAdmin}
+            />
+            <div className="flex-1 flex flex-col min-w-0 min-h-0">
+              <ManagementPanel
+                groups={groups}
+                onUpdateGroups={setGroups}
+                showUsers={showUsers}
+                groupsLayout={groupsLayout}
+                activeView={activeView}
+                onSetActiveView={setActiveView}
+                hideHeader
+                activeOrgId={activeOrgId}
+                tenants={tenants}
+                onNavigateToTenantUsers={handleNavigateToTenantUsers}
+                isAdmin={params.isAdmin}
+              />
+            </div>
           </div>
+        ) : (
+          <div className="min-h-screen bg-gray-2 flex flex-col">
+            {/* Navigation */}
+            <div ref={navRef} className="relative z-40 shrink-0">
+              <NavShell
+                rightSlot={
+                  <>
+                    <AccountPicker
+                      isOpen={openMenu === 'account'}
+                      onToggle={() => toggle('account')}
+                      onClose={closeMenus}
+                    />
+                    <UserAvatarDropdown
+                      isOpen={openMenu === 'avatar'}
+                      onToggle={() => toggle('avatar')}
+                      onClose={closeMenus}
+                      onManageGroupsRoles={() => {}}
+                    />
+                  </>
+                }
+              >
+                <HubGroup openMenu={openMenu} toggle={toggle} close={closeMenus} />
+              </NavShell>
+            </div>
 
-          {/* Content */}
-          <ManagementPanel
-            groups={groups}
-            onUpdateGroups={setGroups}
-            showUsers={params.showUsersTab as boolean}
-            groupsLayout={params.groupsLayout as GroupsLayout}
-          />
-        </div>
+            {/* Content */}
+            <ManagementPanel
+              groups={groups}
+              onUpdateGroups={setGroups}
+              showUsers={showUsers}
+              groupsLayout={groupsLayout}
+              activeView={activeView}
+              onSetActiveView={setActiveView}
+              activeOrgId={activeOrgId}
+              tenants={tenants}
+              onNavigateToTenantUsers={handleNavigateToTenantUsers}
+              isAdmin={params.isAdmin}
+            />
+          </div>
+        )}
       </ShowDescriptionsContext.Provider>
     </ShowIconsContext.Provider>
   );

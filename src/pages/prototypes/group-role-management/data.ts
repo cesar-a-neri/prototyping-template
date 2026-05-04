@@ -259,22 +259,23 @@ export type TenantUser = {
   lastActive: string;
   groups: string[];
   createdAt: string;
+  orgName?: string;
 };
 
 export const TENANT_USERS: TenantUser[] = [
-  { id: 'u1', name: 'Alice Chen', email: 'alice.chen@acme.com', initials: 'AC', type: 'user', status: 'active', lastActive: '2026-04-16', groups: ['Platform Engineering', 'Security & Compliance'], createdAt: '2024-11-02' },
-  { id: 'u2', name: 'Bob Martinez', email: 'bob.martinez@acme.com', initials: 'BM', type: 'user', status: 'active', lastActive: '2026-04-16', groups: ['Platform Engineering', 'ML Operations', 'Data Science Team', 'Security & Compliance', 'Product Team'], createdAt: '2024-11-05' },
-  { id: 'u3', name: 'Carol Singh', email: 'carol.singh@acme.com', initials: 'CS', type: 'user', status: 'active', lastActive: '2026-04-15', groups: ['Platform Engineering'], createdAt: '2024-12-01' },
-  { id: 'u4', name: 'David Kim', email: 'david.kim@acme.com', initials: 'DK', type: 'user', status: 'active', lastActive: '2026-04-14', groups: ['Platform Engineering', 'Security & Compliance'], createdAt: '2024-12-10' },
-  { id: 'u5', name: 'Eve Thompson', email: 'eve.thompson@acme.com', initials: 'ET', type: 'user', status: 'active', lastActive: '2026-04-16', groups: ['Data Science Team'], createdAt: '2025-01-08' },
-  { id: 'u6', name: 'Frank Liu', email: 'frank.liu@acme.com', initials: 'FL', type: 'user', status: 'active', lastActive: '2026-04-13', groups: ['Data Science Team'], createdAt: '2025-01-15' },
-  { id: 'u7', name: 'Grace Okafor', email: 'grace.okafor@acme.com', initials: 'GO', type: 'user', status: 'active', lastActive: '2026-04-16', groups: ['Data Science Team', 'Product Team'], createdAt: '2025-01-20' },
-  { id: 'u8', name: 'Henry Patel', email: 'henry.patel@acme.com', initials: 'HP', type: 'user', status: 'inactive', lastActive: '2026-03-01', groups: ['ML Operations', 'Product Team'], createdAt: '2025-02-01' },
-  { id: 'u9', name: 'Irene Nakamura', email: 'irene.nakamura@acme.com', initials: 'IN', type: 'user', status: 'active', lastActive: '2026-04-15', groups: [], createdAt: '2025-03-10' },
-  { id: 'u10', name: 'James Wilson', email: 'james.wilson@acme.com', initials: 'JW', type: 'user', status: 'pending', lastActive: 'Never', groups: [], createdAt: '2026-04-14' },
-  { id: 'u11', name: 'Karen Lee', email: 'karen.lee@acme.com', initials: 'KL', type: 'user', status: 'active', lastActive: '2026-04-12', groups: [], createdAt: '2025-04-01' },
-  { id: 'sa1', name: 'ci-pipeline-bot', email: 'ci-pipeline@svc.acme.com', initials: 'CI', type: 'service-account', status: 'active', lastActive: '2026-04-16', groups: ['Platform Engineering'], createdAt: '2025-01-15' },
-  { id: 'sa2', name: 'deploy-agent', email: 'deploy-agent@svc.acme.com', initials: 'DA', type: 'service-account', status: 'active', lastActive: '2026-04-16', groups: ['Data Science Team'], createdAt: '2025-02-01' },
+  { id: 'u1',  name: 'Alice Chen',      email: 'alice.chen@acme.com',      initials: 'AC', type: 'user',            status: 'active',   lastActive: '2026-04-16', groups: ['Platform Engineering', 'Security & Compliance'], createdAt: '2024-11-02', orgName: 'Acme Org' },
+  { id: 'u2',  name: 'Bob Martinez',    email: 'bob.martinez@acme.com',    initials: 'BM', type: 'user',            status: 'active',   lastActive: '2026-04-16', groups: ['Platform Engineering', 'ML Operations', 'Data Science Team', 'Security & Compliance', 'Product Team'], createdAt: '2024-11-05', orgName: 'Acme Org' },
+  { id: 'u3',  name: 'Carol Singh',     email: 'carol.singh@acme.com',     initials: 'CS', type: 'user',            status: 'active',   lastActive: '2026-04-15', groups: ['Platform Engineering'], createdAt: '2024-12-01', orgName: 'Acme Org' },
+  { id: 'u4',  name: 'David Kim',       email: 'david.kim@acme.com',       initials: 'DK', type: 'user',            status: 'active',   lastActive: '2026-04-14', groups: ['Platform Engineering', 'Security & Compliance'], createdAt: '2024-12-10', orgName: 'Beta Org' },
+  { id: 'u5',  name: 'Eve Thompson',    email: 'eve.thompson@acme.com',    initials: 'ET', type: 'user',            status: 'active',   lastActive: '2026-04-16', groups: ['Data Science Team'], createdAt: '2025-01-08', orgName: 'Beta Org' },
+  { id: 'u6',  name: 'Frank Liu',       email: 'frank.liu@acme.com',       initials: 'FL', type: 'user',            status: 'active',   lastActive: '2026-04-13', groups: ['Data Science Team'], createdAt: '2025-01-15', orgName: 'Acme Org' },
+  { id: 'u7',  name: 'Grace Okafor',    email: 'grace.okafor@acme.com',    initials: 'GO', type: 'user',            status: 'active',   lastActive: '2026-04-16', groups: ['Data Science Team', 'Product Team'], createdAt: '2025-01-20', orgName: 'Beta Org' },
+  { id: 'u8',  name: 'Henry Patel',     email: 'henry.patel@acme.com',     initials: 'HP', type: 'user',            status: 'inactive', lastActive: '2026-03-01', groups: ['ML Operations', 'Product Team'], createdAt: '2025-02-01', orgName: 'Acme Org' },
+  { id: 'u9',  name: 'Irene Nakamura',  email: 'irene.nakamura@acme.com',  initials: 'IN', type: 'user',            status: 'active',   lastActive: '2026-04-15', groups: [], createdAt: '2025-03-10', orgName: 'Beta Org' },
+  { id: 'u10', name: 'James Wilson',    email: 'james.wilson@acme.com',    initials: 'JW', type: 'user',            status: 'pending',  lastActive: 'Never',      groups: [], createdAt: '2026-04-14' },
+  { id: 'u11', name: 'Karen Lee',       email: 'karen.lee@acme.com',       initials: 'KL', type: 'user',            status: 'active',   lastActive: '2026-04-12', groups: [], createdAt: '2025-04-01', orgName: 'Acme Org' },
+  { id: 'sa1', name: 'ci-pipeline-bot', email: 'ci-pipeline@svc.acme.com', initials: 'CI', type: 'service-account', status: 'active',   lastActive: '2026-04-16', groups: ['Platform Engineering'], createdAt: '2025-01-15' },
+  { id: 'sa2', name: 'deploy-agent',    email: 'deploy-agent@svc.acme.com',initials: 'DA', type: 'service-account', status: 'active',   lastActive: '2026-04-16', groups: ['Data Science Team'], createdAt: '2025-02-01' },
   { id: 'sa3', name: 'monitoring-svc', email: 'monitoring@svc.acme.com', initials: 'MS', type: 'service-account', status: 'active', lastActive: '2026-04-15', groups: ['ML Operations'], createdAt: '2025-02-15' },
 ];
 

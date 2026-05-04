@@ -941,7 +941,7 @@ interface MemberRowProps {
 }
 
 const MemberRow: React.FC<MemberRowProps> = ({ member, isOnlyOwner, onChangeRole, onRemove }) => (
-  <div className="flex items-center gap-3 px-1 py-2 rounded-lg">
+  <div className="group flex items-center gap-3 px-1 py-2 rounded-lg hover:bg-gray-2 transition-colors">
     <MemberAvatar member={member} />
     <div className="flex-1 min-w-0">
       <div className="flex items-center gap-2">
@@ -956,7 +956,7 @@ const MemberRow: React.FC<MemberRowProps> = ({ member, isOnlyOwner, onChangeRole
     </div>
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
-        <button className="flex items-center gap-1 px-2 py-1 rounded-md text-[12px] font-medium text-gray-10 hover:bg-gray-3 transition-colors">
+        <button className="flex items-center gap-1 px-2 py-1 rounded-md text-[12px] font-medium text-gray-10 hover:bg-gray-4 group-hover:bg-gray-3 transition-colors">
           {member.role === 'owner' ? 'Owner' : 'Member'}
           <ChevronDown size={12} className="text-gray-8" />
         </button>
