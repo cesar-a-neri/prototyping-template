@@ -39,13 +39,13 @@ interface AddTenantMembersDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   existingIds: string[];
-  onAdd: (members: { id: string; name: string; email: string; initials: string; role: 'member' | 'admin'; orgName?: string }[]) => void;
+  onAdd: (members: { id: string; name: string; email: string; initials: string; role: 'admin' | 'developer' | 'user' | 'viewer'; orgName?: string }[]) => void;
 }
 
 const AddTenantMembersDialog: React.FC<AddTenantMembersDialogProps> = ({ open, onOpenChange, existingIds, onAdd }) => {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
-  const [role, setRole] = useState<'member' | 'admin'>('member');
+  const [role, setRole] = useState<'admin' | 'developer' | 'user' | 'viewer'>('user');
 
   const available = ORG_CANDIDATES.filter(c => !existingIds.includes(c.id));
   const filtered = available.filter(c =>
@@ -68,7 +68,7 @@ const AddTenantMembersDialog: React.FC<AddTenantMembersDialogProps> = ({ open, o
     onOpenChange(false);
   };
 
-  const reset = () => { setSelected([]); setSearch(''); setRole('member'); };
+  const reset = () => { setSelected([]); setSearch(''); setRole('user'); };
 
   return (
     <Dialog.Root open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
@@ -111,7 +111,7 @@ const AddTenantMembersDialog: React.FC<AddTenantMembersDialogProps> = ({ open, o
                   </DropdownMenu.Trigger>
                   <DropdownMenu.Portal>
                     <DropdownMenu.Content align="end" sideOffset={4} className="bg-white rounded-lg shadow-xl border border-gray-5 py-1 w-[130px] z-[60] animate-in fade-in slide-in-from-top-1 duration-150">
-                      {(['member', 'admin'] as const).map(r => (
+                      {(['admin', 'developer', 'user', 'viewer'] as const).map(r => (
                         <DropdownMenu.Item
                           key={r}
                           onClick={() => setRole(r)}
@@ -231,8 +231,8 @@ const UserAvatar: React.FC<{ user: TenantUser }> = ({ user }) => {
   const palette = AVATAR_PALETTES[hashName(user.name) % AVATAR_PALETTES.length];
   return (
     <div className={cn(
-      'w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-medium shrink-0',
-      isService ? 'bg-gray-3 text-gray-10' : `${palette.bg} ${palette.text}`,
+      'w-8 h-8 flex items-center justify-center text-[12px] font-medium shrink-0',
+      isService ? 'rounded-lg bg-gray-3 text-gray-10' : `rounded-full ${palette.bg} ${palette.text}`,
     )}>
       {user.initials}
     </div>
@@ -303,17 +303,18 @@ const GroupsCell: React.FC<{ groups: string[]; onNavigateToGroup?: (name: string
 
 // ─── Sort Types ───────────────────────────────────────────────────────────────
 
-type SortField = 'name' | 'email' | 'status' | 'createdAt' | 'groups';
+type SortField = 'name' | 'email' | 'status' | 'createdAt' | 'groups' | 'role' | 'orgName';
 type SortDir = 'asc' | 'desc';
 
 // ─── Users Management ─────────────────────────────────────────────────────────
 
 interface UsersManagementProps {
   onNavigateToGroup?: (groupName: string) => void;
+  onNavigateToOrg?: (orgName: string) => void;
   isAdmin?: boolean;
 }
 
-export const UsersManagement: React.FC<UsersManagementProps> = ({ onNavigateToGroup, isAdmin }) => {
+export const UsersManagement: React.FC<UsersManagementProps> = ({ onNavigateToGroup, onNavigateToOrg }) => {
   const [users, setUsers] = useState<TenantUser[]>(TENANT_USERS);
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState<SortField>('name');
@@ -324,11 +325,11 @@ export const UsersManagement: React.FC<UsersManagementProps> = ({ onNavigateToGr
   const handleRemoveUser = (userId: string) =>
     setUsers(prev => prev.filter(u => u.id !== userId));
 
-  const handleAddMembers = (members: { id: string; name: string; email: string; initials: string; role: 'member' | 'admin'; orgName?: string }[]) => {
+  const handleAddMembers = (members: { id: string; name: string; email: string; initials: string; role: 'admin' | 'developer' | 'user' | 'viewer'; orgName?: string }[]) => {
     const today = new Date().toISOString().split('T')[0];
     const newUsers: TenantUser[] = members.map(m => ({
       id: m.id, name: m.name, email: m.email, initials: m.initials,
-      type: 'user' as const, status: 'active' as const,
+      type: 'user' as const, status: 'active' as const, role: m.role,
       lastActive: 'Never', groups: [], createdAt: today, orgName: m.orgName,
     }));
     setUsers(prev => [...prev, ...newUsers]);
@@ -360,6 +361,8 @@ export const UsersManagement: React.FC<UsersManagementProps> = ({ onNavigateToGr
         case 'status': return dir * a.status.localeCompare(b.status);
         case 'createdAt': return dir * a.createdAt.localeCompare(b.createdAt);
         case 'groups': return dir * (a.groups.length - b.groups.length);
+        case 'role': return dir * a.role.localeCompare(b.role);
+        case 'orgName': return dir * (a.orgName ?? '').localeCompare(b.orgName ?? '');
         default: return 0;
       }
     });
@@ -441,9 +444,10 @@ export const UsersManagement: React.FC<UsersManagementProps> = ({ onNavigateToGr
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-4">
-                      <SortHeader field="name" label="User" className="w-[220px]" />
+                      <SortHeader field="name" label="Member" className="w-[220px]" />
                       <SortHeader field="status" label="Status" className="w-[110px]" />
-                      {isAdmin && <th className="text-left text-[11px] font-medium text-gray-9 uppercase tracking-wider pb-2.5 pr-3 w-[110px]">Org</th>}
+                      <SortHeader field="orgName" label="Org" className="w-[110px]" />
+                      <SortHeader field="role" label="Role" className="w-[120px]" />
                       <SortHeader field="groups" label="Groups" />
                       <SortHeader field="createdAt" label="Date Added" className="w-[120px]" />
                       <th className="w-[40px]" />
@@ -483,14 +487,39 @@ export const UsersManagement: React.FC<UsersManagementProps> = ({ onNavigateToGr
                         <td className="py-2.5 pr-3">
                           <StatusBadge status={user.status} />
                         </td>
-                        {isAdmin && (
-                          <td className="py-2.5 pr-3">
-                            {user.orgName
-                              ? <span className="text-[12px] text-gray-11">{user.orgName}</span>
-                              : <span className="text-[12px] text-gray-7 italic">—</span>
-                            }
-                          </td>
-                        )}
+                        <td className="py-2.5 pr-3">
+                          {user.orgName
+                            ? onNavigateToOrg
+                              ? <button onClick={() => onNavigateToOrg(user.orgName!)} className="text-[12px] text-[#5B5CE6] hover:underline transition-colors text-left">{user.orgName}</button>
+                              : <span className="text-[12px] text-gray-11">{user.orgName}</span>
+                            : <span className="text-[12px] text-gray-7 italic">—</span>
+                          }
+                        </td>
+                        <td className="py-2.5 pr-3">
+                          <DropdownMenu.Root>
+                            <DropdownMenu.Trigger asChild>
+                              <button className="flex items-center gap-1 px-2 py-1 rounded-md text-[12px] font-medium text-gray-10 hover:bg-gray-3 transition-colors capitalize">
+                                {user.role} <ChevronDown size={11} className="text-gray-8" />
+                              </button>
+                            </DropdownMenu.Trigger>
+                            <DropdownMenu.Portal>
+                              <DropdownMenu.Content align="start" sideOffset={4} className="bg-white rounded-lg shadow-xl border border-gray-5 py-1 w-[130px] z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                                {(['admin', 'developer', 'user', 'viewer'] as const).map(r => (
+                                  <DropdownMenu.Item
+                                    key={r}
+                                    onClick={() => setUsers(prev => prev.map(u => u.id === user.id ? { ...u, role: r } : u))}
+                                    className={cn('flex items-center justify-between px-3 py-1.5 text-[13px] cursor-pointer outline-none transition-colors capitalize',
+                                      r === user.role ? 'text-[#5B5CE6] bg-[#0011FF08]' : 'text-gray-11 hover:bg-[#0011FF0F] hover:text-[#2E1E71]'
+                                    )}
+                                  >
+                                    {r}
+                                    {r === user.role && <Check size={13} className="text-[#5B5CE6]" />}
+                                  </DropdownMenu.Item>
+                                ))}
+                              </DropdownMenu.Content>
+                            </DropdownMenu.Portal>
+                          </DropdownMenu.Root>
+                        </td>
                         <td className="py-2.5 pr-3">
                           <GroupsCell groups={user.groups} onNavigateToGroup={onNavigateToGroup} />
                         </td>

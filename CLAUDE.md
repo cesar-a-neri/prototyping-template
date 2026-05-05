@@ -1,3 +1,8 @@
+---
+description: 
+alwaysApply: true
+---
+
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
@@ -143,3 +148,14 @@ Every prototype automatically gets a source code viewer. The `SourceCodeModal` c
 ### Theme System
 
 Semantic CSS custom properties (`--background`, `--primary`, `--border`, etc.) are defined in `src/lib/theme/theme.ts` using Radix Colors and injected by `ThemeProvider`. All Radix color scales are also available as CSS variables (e.g., `var(--blue-9)`, `var(--iris-a3)`). Use `useTheme()` from `@/lib/theme` to read or toggle the current theme mode.
+
+## Deployment Target: Vercel
+This project is deployed on Vercel. All code must be Vercel-compatible:
+
+- Use Vercel serverless functions (not long-running servers)
+- API routes go in `/api` directory (or `app/api` for Next.js App Router)
+- No unsupported Node.js APIs (e.g. no `fs` writes outside `/tmp`)
+- Environment variables must be configured in Vercel dashboard
+- Edge Runtime constraints apply where relevant
+- Build output must be compatible with Vercel's build system
+- Avoid dependencies that require native binaries unless Vercel supports them

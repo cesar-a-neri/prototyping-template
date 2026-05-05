@@ -8,7 +8,8 @@ import * as Separator from '@radix-ui/react-separator';
 import * as Tabs from '@radix-ui/react-tabs';
 import * as Dialog from '@radix-ui/react-dialog';
 import { cn } from '@/lib/utils';
-import { useTweakpane } from '@/lib/tweakpane';
+import { useTweakpane, useDebugMode } from '@/lib/tweakpane';
+import { Copy, CopyCheck } from 'lucide-react';
 import {
   NavShell, HubGroup, AccountPicker, BRAND, BRAND_LIGHT,
   useOutsideClick, ShowIconsContext, ShowDescriptionsContext,
@@ -287,6 +288,7 @@ type OrgMemberStatus = 'active' | 'pending' | 'inactive';
 
 interface OrgMember {
   id: string; name: string; email: string; initials: string;
+  type: 'user' | 'service-account';
   role: 'member' | 'admin';
   status: OrgMemberStatus;
   tenantIds: string[];
@@ -304,14 +306,21 @@ const INITIAL_ORGS: Org[] = [
 
 const MOCK_ORG_MEMBERS: Record<string, OrgMember[]> = {
   o1: [
-    { id: 'u1', name: 'Alice Smith',  email: 'alice@acme.com',  initials: 'AS', role: 'admin',  status: 'active',   tenantIds: ['t1'] },
-    { id: 'u2', name: 'Bob Jones',    email: 'bob@acme.com',    initials: 'BJ', role: 'member', status: 'active',   tenantIds: ['t1', 't2'] },
-    { id: 'u3', name: 'Carol White',  email: 'carol@acme.com',  initials: 'CW', role: 'member', status: 'pending',  tenantIds: [] },
-    { id: 'u4', name: 'David Lee',    email: 'david@acme.com',  initials: 'DL', role: 'member', status: 'inactive', tenantIds: ['t2'] },
+    { id: 'u1',  name: 'Alice Chen',      email: 'alice.chen@acme.com',      initials: 'AC', type: 'user',            role: 'admin',  status: 'active',   tenantIds: ['t1', 't2'] },
+    { id: 'u2',  name: 'Bob Martinez',    email: 'bob.martinez@acme.com',    initials: 'BM', type: 'user',            role: 'member', status: 'active',   tenantIds: ['t1', 't2'] },
+    { id: 'u3',  name: 'Carol Singh',     email: 'carol.singh@acme.com',     initials: 'CS', type: 'user',            role: 'member', status: 'active',   tenantIds: ['t1'] },
+    { id: 'u6',  name: 'Frank Liu',       email: 'frank.liu@acme.com',       initials: 'FL', type: 'user',            role: 'member', status: 'active',   tenantIds: ['t1'] },
+    { id: 'u8',  name: 'Henry Patel',     email: 'henry.patel@acme.com',     initials: 'HP', type: 'user',            role: 'member', status: 'inactive', tenantIds: ['t2'] },
+    { id: 'u11', name: 'Karen Lee',       email: 'karen.lee@acme.com',       initials: 'KL', type: 'user',            role: 'member', status: 'active',   tenantIds: [] },
+    { id: 'sa1', name: 'ci-pipeline-bot', email: 'ci-pipeline@svc.acme.com', initials: 'CI', type: 'service-account', role: 'member', status: 'active',   tenantIds: ['t1', 't2'] },
+    { id: 'sa3', name: 'monitoring-svc',  email: 'monitoring@svc.acme.com',  initials: 'MS', type: 'service-account', role: 'member', status: 'active',   tenantIds: ['t1'] },
   ],
   o2: [
-    { id: 'u5', name: 'Eve Wilson',   email: 'eve@beta.com',    initials: 'EW', role: 'admin',  status: 'active',  tenantIds: ['t1', 't2'] },
-    { id: 'u6', name: 'Frank Brown',  email: 'frank@beta.com',  initials: 'FB', role: 'member', status: 'pending', tenantIds: ['t2'] },
+    { id: 'u4',  name: 'David Kim',      email: 'david.kim@acme.com',       initials: 'DK', type: 'user',            role: 'admin',  status: 'active', tenantIds: ['t1', 't2'] },
+    { id: 'u5',  name: 'Eve Thompson',   email: 'eve.thompson@acme.com',    initials: 'ET', type: 'user',            role: 'member', status: 'active', tenantIds: ['t1'] },
+    { id: 'u7',  name: 'Grace Okafor',   email: 'grace.okafor@acme.com',    initials: 'GO', type: 'user',            role: 'member', status: 'active', tenantIds: ['t1', 't2'] },
+    { id: 'u9',  name: 'Irene Nakamura', email: 'irene.nakamura@acme.com',  initials: 'IN', type: 'user',            role: 'member', status: 'active', tenantIds: ['t2'] },
+    { id: 'sa2', name: 'deploy-agent',   email: 'deploy-agent@svc.acme.com',initials: 'DA', type: 'service-account', role: 'member', status: 'active', tenantIds: ['t1', 't2'] },
   ],
 };
 
@@ -481,7 +490,7 @@ const OrgMembersView: React.FC<OrgMembersViewProps> = ({ orgId, tenants, onNavig
       const initials = parts.map(p => p.charAt(0).toUpperCase()).join('').slice(0, 2);
       return {
         id: `inv-${Date.now()}-${i}`, name, email: inv.email,
-        initials, role: inv.role, status: 'pending' as OrgMemberStatus, tenantIds: [],
+        initials, type: 'user' as const, role: inv.role, status: 'pending' as OrgMemberStatus, tenantIds: [],
       };
     });
     setMembers(prev => [...prev, ...newMembers]);
@@ -523,7 +532,7 @@ const OrgMembersView: React.FC<OrgMembersViewProps> = ({ orgId, tenants, onNavig
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-4">
-                  <th className="text-left text-[11px] font-medium text-gray-9 uppercase tracking-wider pb-2.5 pr-3">Member</th>
+                  <th className="text-left text-[11px] font-medium text-gray-9 uppercase tracking-wider pb-2.5 pr-3">Identity</th>
                   <th className="text-left text-[11px] font-medium text-gray-9 uppercase tracking-wider pb-2.5 pr-3 w-[100px]">Status</th>
                   <th className="text-left text-[11px] font-medium text-gray-9 uppercase tracking-wider pb-2.5 pr-3 w-[110px]">Role</th>
                   <th className="text-left text-[11px] font-medium text-gray-9 uppercase tracking-wider pb-2.5">Tenants</th>
@@ -537,11 +546,21 @@ const OrgMembersView: React.FC<OrgMembersViewProps> = ({ orgId, tenants, onNavig
                     <tr key={member.id} className="border-b border-gray-3 last:border-b-0 group">
                       <td className="py-2.5 pr-3">
                         <div className="flex items-center gap-2.5">
-                          <div className={cn('w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-medium shrink-0', palette.bg, palette.text)}>
+                          <div className={cn(
+                            'w-8 h-8 flex items-center justify-center text-[12px] font-medium shrink-0',
+                            member.type === 'service-account'
+                              ? 'rounded-lg bg-gray-3 text-gray-10'
+                              : `rounded-full ${palette.bg} ${palette.text}`,
+                          )}>
                             {member.initials}
                           </div>
                           <div>
-                            <p className="text-[13px] font-medium text-gray-12">{member.name}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-[13px] font-medium text-gray-12">{member.name}</p>
+                              {member.type === 'service-account' && (
+                                <span className="text-[10px] font-medium text-gray-10 bg-gray-3 px-1.5 py-0.5 rounded shrink-0">Service</span>
+                              )}
+                            </div>
                             <p className="text-[11px] text-gray-9">{member.email}</p>
                           </div>
                         </div>
@@ -626,6 +645,28 @@ const OrgMembersView: React.FC<OrgMembersViewProps> = ({ orgId, tenants, onNavig
   );
 };
 
+// ─── Copy ID Button ───────────────────────────────────────────────────────────
+
+const CopyIdMenuItem: React.FC<{ id: string; entityType: 'org' | 'tenant' }> = ({ id, entityType }) => {
+  const [copied, setCopied] = useState(false);
+  const label = entityType === 'org' ? 'Copy Org ID' : 'Copy Tenant ID';
+  return (
+    <DropdownMenu.Item
+      onSelect={e => {
+        e.preventDefault();
+        navigator.clipboard.writeText(id).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        });
+      }}
+      className="flex items-center gap-2 px-3 py-1.5 text-[13px] text-gray-11 hover:bg-[#0011FF0F] hover:text-[#2E1E71] cursor-pointer outline-none transition-colors"
+    >
+      {copied ? <CopyCheck size={13} className="text-green-10 shrink-0" /> : <Copy size={13} className="shrink-0" />}
+      {label}
+    </DropdownMenu.Item>
+  );
+};
+
 // ─── Control Plane Left Sidebar ───────────────────────────────────────────────
 
 interface ControlPlaneLeftSidebarProps {
@@ -637,9 +678,10 @@ interface ControlPlaneLeftSidebarProps {
   tenants: Tenant[];
   onUpdateTenants: (tenants: Tenant[]) => void;
   isAdmin: boolean;
+  headerStyle?: 'logo' | 'back-button';
 }
 
-const ControlPlaneLeftSidebar: React.FC<ControlPlaneLeftSidebarProps> = ({ activeView, activeOrgId, onSetActiveView, onNavigateOrg, showUsers, tenants, onUpdateTenants, isAdmin }) => {
+const ControlPlaneLeftSidebar: React.FC<ControlPlaneLeftSidebarProps> = ({ activeView, activeOrgId, onSetActiveView, onNavigateOrg, showUsers, tenants, onUpdateTenants, isAdmin, headerStyle = 'logo' }) => {
   const [orgs, setOrgs] = useState<Org[]>(INITIAL_ORGS);
   const [activeTenantId, setActiveTenantId] = useState('t1');
   const [openAccordions, setOpenAccordions] = useState<Set<string>>(new Set(['t1', 'o1']));
@@ -658,7 +700,7 @@ const ControlPlaneLeftSidebar: React.FC<ControlPlaneLeftSidebarProps> = ({ activ
   const [archiveTargetId, setArchiveTargetId] = useState<string | null>(null);
 
   const tenantNavItems: { value: ManagementView; label: string; Icon: React.ElementType }[] = [
-    ...(showUsers ? [{ value: 'users' as ManagementView, label: 'Users', Icon: Users }] : []),
+    ...(showUsers ? [{ value: 'users' as ManagementView, label: 'Members', Icon: Users }] : []),
     { value: 'groups', label: 'Groups', Icon: LayoutGrid },
     { value: 'roles', label: 'Roles', Icon: ShieldCheck },
   ];
@@ -748,7 +790,7 @@ const ControlPlaneLeftSidebar: React.FC<ControlPlaneLeftSidebarProps> = ({ activ
             : 'text-gray-10 hover:bg-gray-2 hover:text-gray-12',
         )}
       >
-        Members
+        Identities
       </button>
     </div>
   );
@@ -768,7 +810,6 @@ const ControlPlaneLeftSidebar: React.FC<ControlPlaneLeftSidebarProps> = ({ activ
             <ChevronDown size={13} className={cn('text-gray-7 shrink-0 transition-transform duration-150', !openAccordions.has(entity.id) && '-rotate-90')} />
             <span className="text-[13px] font-medium text-gray-11 truncate">{entity.name}</span>
           </button>
-          {!readonly && (
           <DropdownMenu.Root open={menuOpenId === menuId} onOpenChange={open => setMenuOpenId(open ? menuId : null)}>
             <DropdownMenu.Trigger asChild>
               <button className="w-6 h-6 rounded flex items-center justify-center text-gray-8 opacity-0 group-hover/entity:opacity-100 data-[state=open]:opacity-100 hover:bg-gray-3 transition-all mr-1 shrink-0">
@@ -777,16 +818,20 @@ const ControlPlaneLeftSidebar: React.FC<ControlPlaneLeftSidebarProps> = ({ activ
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>
               <DropdownMenu.Content align="start" sideOffset={4} className="bg-white rounded-lg shadow-xl border border-gray-5 py-1 w-[150px] z-50 animate-in fade-in slide-in-from-top-1 duration-150">
-                <DropdownMenu.Item onClick={() => openDialog(entityType, 'rename', entity.id)} className="flex items-center gap-2 px-3 py-1.5 text-[13px] text-gray-11 hover:bg-[#0011FF0F] hover:text-[#2E1E71] cursor-pointer outline-none transition-colors">
-                  Rename
-                </DropdownMenu.Item>
-                <DropdownMenu.Item onClick={() => openArchiveConfirm(entityType, entity.id)} className="flex items-center gap-2 px-3 py-1.5 text-[13px] text-red-10 hover:bg-red-2 cursor-pointer outline-none transition-colors">
-                  Archive
-                </DropdownMenu.Item>
+                <CopyIdMenuItem id={entity.id} entityType={entityType} />
+                {!readonly && (
+                  <>
+                    <DropdownMenu.Item onClick={() => openDialog(entityType, 'rename', entity.id)} className="flex items-center gap-2 px-3 py-1.5 text-[13px] text-gray-11 hover:bg-[#0011FF0F] hover:text-[#2E1E71] cursor-pointer outline-none transition-colors">
+                      <Pencil size={13} className="shrink-0" /> Rename
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item onClick={() => openArchiveConfirm(entityType, entity.id)} className="flex items-center gap-2 px-3 py-1.5 text-[13px] text-red-10 hover:bg-red-2 cursor-pointer outline-none transition-colors">
+                      <Trash2 size={13} className="shrink-0" /> Archive
+                    </DropdownMenu.Item>
+                  </>
+                )}
               </DropdownMenu.Content>
             </DropdownMenu.Portal>
           </DropdownMenu.Root>
-          )}
         </div>
         {openAccordions.has(entity.id) && (
           entityType === 'tenant' ? renderTenantNavItems(entity.id) : renderOrgNavItems(entity.id)
@@ -797,12 +842,12 @@ const ControlPlaneLeftSidebar: React.FC<ControlPlaneLeftSidebarProps> = ({ activ
 
   const SectionHeader: React.FC<{ label: string; icon: React.ReactNode; onAdd?: () => void; mt?: boolean }> = ({ label, icon, onAdd, mt }) => (
     <div className={cn('flex items-center justify-between pl-2 py-1 mb-0.5', mt && 'mt-3')}>
-      <div className="flex items-center gap-1.5 text-gray-8">
+      <div className="flex items-center gap-1.5 text-gray-12">
         {icon}
-        <span className="text-[13px] font-medium text-gray-8">{label}</span>
+        <span className="text-[13px] font-medium text-gray-12">{label}</span>
       </div>
       {onAdd && (
-        <button onClick={onAdd} className="w-6 h-6 rounded flex items-center justify-center text-gray-7 hover:bg-gray-3 hover:text-gray-12 transition-colors mr-1 shrink-0">
+        <button onClick={onAdd} className="w-6 h-6 rounded flex items-center justify-center text-gray-10 hover:bg-gray-3 hover:text-gray-12 transition-colors mr-1 shrink-0">
           <Plus size={12} />
         </button>
       )}
@@ -811,15 +856,20 @@ const ControlPlaneLeftSidebar: React.FC<ControlPlaneLeftSidebarProps> = ({ activ
 
   return (
     <div className="w-[240px] h-full flex flex-col border-r border-gray-4 shrink-0" style={{ backgroundColor: '#fafafa' }}>
-      {/* Logo */}
-      <div className="px-4 py-4 flex items-center gap-2.5 shrink-0">
-        <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, rgb(59, 130, 246) 0%, rgb(139, 92, 246) 50%, rgb(59, 130, 246) 100%)' }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2L13.09 8.26L16 6L14.74 9.74L20 8L16.74 11.09L22 12L16.74 12.91L20 16L14.74 14.26L16 18L13.09 15.74L12 22L10.91 15.74L8 18L9.26 14.26L4 16L7.26 12.91L2 12L7.26 11.09L4 8L9.26 9.74L8 6L10.91 8.26L12 2Z" fill="white" />
-          </svg>
+      {/* Header */}
+      {headerStyle === 'back-button' ? (
+        <div className="px-4 py-4 flex items-center gap-2.5 shrink-0">
+          <button className="w-6 h-6 rounded-md border border-gray-5 flex items-center justify-center text-gray-10 hover:bg-gray-3 hover:text-gray-12 transition-colors shrink-0">
+            <ArrowLeft size={13} />
+          </button>
+          <span className="text-[14px] font-semibold text-gray-12">Identity & Access</span>
         </div>
-        <span className="text-[14px] font-semibold text-gray-12">Control Plane</span>
-      </div>
+      ) : (
+        <div className="px-4 py-4 flex items-center gap-2.5 shrink-0">
+          <img src="/images/logo-icon.png" alt="Logo" className="w-6 h-6 rounded-md shrink-0 object-cover" />
+          <span className="text-[14px] font-semibold text-gray-12">Control Plane</span>
+        </div>
+      )}
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-1 overflow-y-auto">
@@ -919,12 +969,13 @@ interface ManagementPanelProps {
   onSetActiveView: (v: ManagementView) => void;
   hideHeader?: boolean;
   activeOrgId: string | null;
+  onSetActiveOrgId: (orgId: string | null) => void;
   tenants: Tenant[];
   onNavigateToTenantUsers: (tenantId: string) => void;
   isAdmin?: boolean;
 }
 
-const ManagementPanel: React.FC<ManagementPanelProps> = ({ groups, onUpdateGroups, showUsers, groupsLayout, activeView, onSetActiveView, hideHeader, activeOrgId, tenants, onNavigateToTenantUsers, isAdmin }) => {
+const ManagementPanel: React.FC<ManagementPanelProps> = ({ groups, onUpdateGroups, showUsers, groupsLayout, activeView, onSetActiveView, hideHeader, activeOrgId, onSetActiveOrgId, tenants, onNavigateToTenantUsers, isAdmin }) => {
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(
     groupsLayout === 'sidebar' ? (groups[0]?.id ?? null) : null
   );
@@ -975,6 +1026,14 @@ const ManagementPanel: React.FC<ManagementPanelProps> = ({ groups, onUpdateGroup
     }
   };
 
+  const handleNavigateToOrg = (orgName: string) => {
+    const org = INITIAL_ORGS.find(o => o.name === orgName);
+    if (org) {
+      onSetActiveOrgId(org.id);
+      onSetActiveView('org-members');
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-gray-1">
       {/* Page header */}
@@ -999,7 +1058,7 @@ const ManagementPanel: React.FC<ManagementPanelProps> = ({ groups, onUpdateGroup
                       'data-[state=inactive]:text-gray-9 data-[state=inactive]:border-transparent data-[state=inactive]:hover:text-gray-11',
                     )}
                   >
-                    Users
+                    Members
                   </Tabs.Trigger>
                 )}
                 <Tabs.Trigger
@@ -1033,9 +1092,9 @@ const ManagementPanel: React.FC<ManagementPanelProps> = ({ groups, onUpdateGroup
         <div className="bg-white px-6 py-4 shrink-0">
           <h1 className="text-[20px] font-semibold text-gray-12">
             {activeView === 'groups' ? 'Groups'
-              : activeView === 'users' ? 'Users'
+              : activeView === 'users' ? 'Members'
               : activeView === 'roles' ? 'Roles'
-              : 'Members'}
+              : 'Identities'}
           </h1>
         </div>
       )}
@@ -1103,12 +1162,12 @@ const ManagementPanel: React.FC<ManagementPanelProps> = ({ groups, onUpdateGroup
       )}
       {activeView === 'org-members' && activeOrgId && (
         <div className="flex-1 bg-white min-h-0">
-          <OrgMembersView orgId={activeOrgId} tenants={tenants} onNavigateToTenantUsers={onNavigateToTenantUsers} />
+          <OrgMembersView key={activeOrgId} orgId={activeOrgId} tenants={tenants} onNavigateToTenantUsers={onNavigateToTenantUsers} />
         </div>
       )}
       {activeView === 'users' && showUsers && (
         <div className="flex-1 bg-white min-h-0">
-          <UsersManagement onNavigateToGroup={handleNavigateToGroup} isAdmin={isAdmin} />
+          <UsersManagement onNavigateToGroup={handleNavigateToGroup} onNavigateToOrg={handleNavigateToOrg} isAdmin={isAdmin} />
         </div>
       )}
 
@@ -1137,9 +1196,17 @@ const ManagementPanel: React.FC<ManagementPanelProps> = ({ groups, onUpdateGroup
 // ─── Main Prototype ───────────────────────────────────────────────────────────
 
 const GroupRoleManagement: React.FC = () => {
+  const { debugMode } = useDebugMode();
   const { params } = useTweakpane(
-    { showUsersTab: true, navLayout: 'left-panel', isAdmin: true },
-    { navLayout: { options: { 'Top Nav': 'top-nav', 'Left Panel': 'left-panel' } } },
+    { App: 'IAM Dashboard', isAdmin: true },
+    { App: { options: { 'IAM Dashboard': 'IAM Dashboard', 'Spark': 'Spark' } } },
+    {
+      alwaysVisible: true,
+      debugParams: { showUsersTab: true, navLayout: 'left-panel' },
+      debugBindingOptions: {
+        navLayout: { options: { 'Top Nav': 'top-nav', 'Left Panel': 'left-panel' } },
+      },
+    },
   );
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [groups, setGroups] = useState<Group[]>(INITIAL_GROUPS);
@@ -1153,9 +1220,13 @@ const GroupRoleManagement: React.FC = () => {
 
   const toggle = (id: string) => setOpenMenu(p => (p === id ? null : id));
 
-  const isLeftPanel = params.navLayout === 'left-panel';
-  const showUsers = params.showUsersTab as boolean;
+  // In debug mode, use the individual tweakpane params directly.
+  // In normal mode, derive everything from the App dropdown.
+  const isLeftPanel = debugMode ? params.navLayout === 'left-panel' : true;
+  const showUsers = debugMode ? (params.showUsersTab as boolean) : true;
+  const isAdmin = params.isAdmin as boolean;
   const groupsLayout: GroupsLayout = isLeftPanel ? 'full-page' : 'sidebar';
+  const headerStyle = params.App === 'IAM Dashboard' ? 'logo' : 'back-button';
 
   const handleNavigateToTenantUsers = (tenantId: string) => {
     // In the sidebar, switch the active tenant accordion and navigate to users view
@@ -1178,7 +1249,8 @@ const GroupRoleManagement: React.FC = () => {
               showUsers={showUsers}
               tenants={tenants}
               onUpdateTenants={setTenants}
-              isAdmin={params.isAdmin}
+              isAdmin={isAdmin}
+              headerStyle={headerStyle}
             />
             <div className="flex-1 flex flex-col min-w-0 min-h-0">
               <ManagementPanel
@@ -1190,9 +1262,10 @@ const GroupRoleManagement: React.FC = () => {
                 onSetActiveView={setActiveView}
                 hideHeader
                 activeOrgId={activeOrgId}
+                onSetActiveOrgId={setActiveOrgId}
                 tenants={tenants}
                 onNavigateToTenantUsers={handleNavigateToTenantUsers}
-                isAdmin={params.isAdmin}
+                isAdmin={isAdmin}
               />
             </div>
           </div>
@@ -1230,9 +1303,10 @@ const GroupRoleManagement: React.FC = () => {
               activeView={activeView}
               onSetActiveView={setActiveView}
               activeOrgId={activeOrgId}
+              onSetActiveOrgId={setActiveOrgId}
               tenants={tenants}
               onNavigateToTenantUsers={handleNavigateToTenantUsers}
-              isAdmin={params.isAdmin}
+              isAdmin={isAdmin}
             />
           </div>
         )}
