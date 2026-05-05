@@ -679,9 +679,10 @@ interface ControlPlaneLeftSidebarProps {
   onUpdateTenants: (tenants: Tenant[]) => void;
   isAdmin: boolean;
   headerStyle?: 'logo' | 'back-button';
+  tenantCrudOnly?: boolean;
 }
 
-const ControlPlaneLeftSidebar: React.FC<ControlPlaneLeftSidebarProps> = ({ activeView, activeOrgId, onSetActiveView, onNavigateOrg, showUsers, tenants, onUpdateTenants, isAdmin, headerStyle = 'logo' }) => {
+const ControlPlaneLeftSidebar: React.FC<ControlPlaneLeftSidebarProps> = ({ activeView, activeOrgId, onSetActiveView, onNavigateOrg, showUsers, tenants, onUpdateTenants, isAdmin, headerStyle = 'logo', tenantCrudOnly = false }) => {
   const [orgs, setOrgs] = useState<Org[]>(INITIAL_ORGS);
   const [activeTenantId, setActiveTenantId] = useState('t1');
   const [openAccordions, setOpenAccordions] = useState<Set<string>>(new Set(['t1', 'o1']));
@@ -797,17 +798,20 @@ const ControlPlaneLeftSidebar: React.FC<ControlPlaneLeftSidebarProps> = ({ activ
 
   const renderEntityRow = (entity: Tenant | Org, entityType: 'org' | 'tenant', readonly = false) => {
     const menuId = `${entityType}-${entity.id}`;
+    const hideSubs = tenantCrudOnly && entityType === 'tenant';
     return (
       <div key={entity.id} className="mb-0.5">
         <div className="group/entity flex items-center">
           <button
             onClick={() => {
-              toggleAccordion(entity.id);
+              if (!hideSubs) toggleAccordion(entity.id);
               if (entityType === 'tenant') setActiveTenantId(entity.id);
             }}
             className="flex-1 flex items-center gap-2 px-2 py-1 rounded-md hover:bg-gray-2 transition-colors min-w-0"
           >
-            <ChevronDown size={13} className={cn('text-gray-7 shrink-0 transition-transform duration-150', !openAccordions.has(entity.id) && '-rotate-90')} />
+            {!hideSubs && (
+              <ChevronDown size={13} className={cn('text-gray-7 shrink-0 transition-transform duration-150', !openAccordions.has(entity.id) && '-rotate-90')} />
+            )}
             <span className="text-[13px] font-medium text-gray-11 truncate">{entity.name}</span>
           </button>
           <DropdownMenu.Root open={menuOpenId === menuId} onOpenChange={open => setMenuOpenId(open ? menuId : null)}>
@@ -833,7 +837,7 @@ const ControlPlaneLeftSidebar: React.FC<ControlPlaneLeftSidebarProps> = ({ activ
             </DropdownMenu.Portal>
           </DropdownMenu.Root>
         </div>
-        {openAccordions.has(entity.id) && (
+        {!hideSubs && openAccordions.has(entity.id) && (
           entityType === 'tenant' ? renderTenantNavItems(entity.id) : renderOrgNavItems(entity.id)
         )}
       </div>
@@ -1198,7 +1202,7 @@ const ManagementPanel: React.FC<ManagementPanelProps> = ({ groups, onUpdateGroup
 const GroupRoleManagement: React.FC = () => {
   const { debugMode } = useDebugMode();
   const { params } = useTweakpane(
-    { App: 'IAM Dashboard', isAdmin: true },
+    { App: 'IAM Dashboard', isAdmin: true, tenantCrudOnly: false },
     { App: { options: { 'IAM Dashboard': 'IAM Dashboard', 'Spark': 'Spark' } } },
     {
       alwaysVisible: true,
@@ -1251,6 +1255,7 @@ const GroupRoleManagement: React.FC = () => {
               onUpdateTenants={setTenants}
               isAdmin={isAdmin}
               headerStyle={headerStyle}
+              tenantCrudOnly={params.tenantCrudOnly as boolean}
             />
             <div className="flex-1 flex flex-col min-w-0 min-h-0">
               <ManagementPanel
