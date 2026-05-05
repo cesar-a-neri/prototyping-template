@@ -799,7 +799,7 @@ const ControlPlaneLeftSidebar: React.FC<ControlPlaneLeftSidebarProps> = ({ activ
     <div className={cn('flex items-center justify-between pl-2 py-1 mb-0.5', mt && 'mt-3')}>
       <div className="flex items-center gap-1.5 text-gray-8">
         {icon}
-        <span className="text-[10px] font-semibold uppercase tracking-wider">{label}</span>
+        <span className="text-[13px] font-medium text-gray-8">{label}</span>
       </div>
       {onAdd && (
         <button onClick={onAdd} className="w-6 h-6 rounded flex items-center justify-center text-gray-7 hover:bg-gray-3 hover:text-gray-12 transition-colors mr-1 shrink-0">
@@ -810,7 +810,7 @@ const ControlPlaneLeftSidebar: React.FC<ControlPlaneLeftSidebarProps> = ({ activ
   );
 
   return (
-    <div className="w-[240px] h-full flex flex-col bg-white border-r border-gray-4 shrink-0">
+    <div className="w-[240px] h-full flex flex-col border-r border-gray-4 shrink-0" style={{ backgroundColor: '#fafafa' }}>
       {/* Logo */}
       <div className="px-4 py-4 flex items-center gap-2.5 shrink-0">
         <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, rgb(59, 130, 246) 0%, rgb(139, 92, 246) 50%, rgb(59, 130, 246) 100%)' }}>
@@ -825,11 +825,11 @@ const ControlPlaneLeftSidebar: React.FC<ControlPlaneLeftSidebarProps> = ({ activ
       <nav className="flex-1 px-3 py-1 overflow-y-auto">
         {isAdmin && (
           <>
-            <SectionHeader label="Orgs" icon={<Building2 size={11} />} onAdd={() => openDialog('org', 'create')} />
+            <SectionHeader label="Orgs" icon={<Building2 size={13} />} onAdd={() => openDialog('org', 'create')} />
             {orgs.map(org => renderEntityRow(org, 'org'))}
           </>
         )}
-        <SectionHeader label="Tenants" icon={<Layers size={11} />} onAdd={isAdmin ? () => openDialog('tenant', 'create') : undefined} mt={isAdmin} />
+        <SectionHeader label="Tenants" icon={<Layers size={13} />} onAdd={isAdmin ? () => openDialog('tenant', 'create') : undefined} mt={isAdmin} />
         {tenants.map(tenant => renderEntityRow(tenant, 'tenant', !isAdmin))}
       </nav>
 
