@@ -1,8 +1,8 @@
 import React, { useState, useRef, useCallback } from 'react';
 import {
-  Users, Settings, LogOut, KeyRound, Plus, BookOpen,
+  Users, Settings, LogOut, KeyRound, Plus, BookOpen, User,
   ArrowLeft, Search, MoreHorizontal, Pencil, Trash2,
-  ShieldCheck, ChevronDown, LayoutGrid, X, Check, Building2, Layers,
+  ShieldCheck, ChevronDown, LayoutGrid, X, Check, Building2, Layers, SlidersHorizontal,
 } from 'lucide-react';
 import * as Separator from '@radix-ui/react-separator';
 import * as Tabs from '@radix-ui/react-tabs';
@@ -18,9 +18,16 @@ import { GroupManagement, GroupFormDialog } from './GroupManagement';
 import { GroupDetail } from './GroupDetail';
 import { RoleReference } from './RoleReference';
 import { UsersManagement } from './UsersManagement';
+import { IdentitiesManagement } from './IdentitiesManagement';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
-import { INITIAL_GROUPS, type Group } from './data';
+import * as Popover from '@radix-ui/react-popover';
+import {
+  INITIAL_GROUPS, type Group,
+  INITIAL_TENANTS, INITIAL_ORGS,
+  MOCK_ORG_MEMBERS, orgRoleLabel,
+  type Tenant, type Org, type OrgMember, type OrgMemberStatus, type OrgRole,
+} from './data';
 
 // ─── User Avatar Dropdown ─────────────────────────────────────────────────────
 
@@ -279,50 +286,7 @@ const GroupsTableView: React.FC<GroupsTableViewProps> = ({ groups, onSelectGroup
 
 // ─── Org / Tenant shared types & mock data ────────────────────────────────────
 
-type ManagementView = 'groups' | 'roles' | 'users' | 'org-members';
-
-interface Tenant { id: string; name: string; }
-interface Org    { id: string; name: string; }
-
-type OrgMemberStatus = 'active' | 'pending' | 'inactive';
-
-interface OrgMember {
-  id: string; name: string; email: string; initials: string;
-  type: 'user' | 'service-account';
-  role: 'member' | 'admin';
-  status: OrgMemberStatus;
-  tenantIds: string[];
-}
-
-const INITIAL_TENANTS: Tenant[] = [
-  { id: 't1', name: 'tenant name' },
-  { id: 't2', name: 'Second Tenant' },
-];
-
-const INITIAL_ORGS: Org[] = [
-  { id: 'o1', name: 'Acme Org' },
-  { id: 'o2', name: 'Beta Org' },
-];
-
-const MOCK_ORG_MEMBERS: Record<string, OrgMember[]> = {
-  o1: [
-    { id: 'u1',  name: 'Alice Chen',      email: 'alice.chen@acme.com',      initials: 'AC', type: 'user',            role: 'admin',  status: 'active',   tenantIds: ['t1', 't2'] },
-    { id: 'u2',  name: 'Bob Martinez',    email: 'bob.martinez@acme.com',    initials: 'BM', type: 'user',            role: 'member', status: 'active',   tenantIds: ['t1', 't2'] },
-    { id: 'u3',  name: 'Carol Singh',     email: 'carol.singh@acme.com',     initials: 'CS', type: 'user',            role: 'member', status: 'active',   tenantIds: ['t1'] },
-    { id: 'u6',  name: 'Frank Liu',       email: 'frank.liu@acme.com',       initials: 'FL', type: 'user',            role: 'member', status: 'active',   tenantIds: ['t1'] },
-    { id: 'u8',  name: 'Henry Patel',     email: 'henry.patel@acme.com',     initials: 'HP', type: 'user',            role: 'member', status: 'inactive', tenantIds: ['t2'] },
-    { id: 'u11', name: 'Karen Lee',       email: 'karen.lee@acme.com',       initials: 'KL', type: 'user',            role: 'member', status: 'active',   tenantIds: [] },
-    { id: 'sa1', name: 'ci-pipeline-bot', email: 'ci-pipeline@svc.acme.com', initials: 'CI', type: 'service-account', role: 'member', status: 'active',   tenantIds: ['t1', 't2'] },
-    { id: 'sa3', name: 'monitoring-svc',  email: 'monitoring@svc.acme.com',  initials: 'MS', type: 'service-account', role: 'member', status: 'active',   tenantIds: ['t1'] },
-  ],
-  o2: [
-    { id: 'u4',  name: 'David Kim',      email: 'david.kim@acme.com',       initials: 'DK', type: 'user',            role: 'admin',  status: 'active', tenantIds: ['t1', 't2'] },
-    { id: 'u5',  name: 'Eve Thompson',   email: 'eve.thompson@acme.com',    initials: 'ET', type: 'user',            role: 'member', status: 'active', tenantIds: ['t1'] },
-    { id: 'u7',  name: 'Grace Okafor',   email: 'grace.okafor@acme.com',    initials: 'GO', type: 'user',            role: 'member', status: 'active', tenantIds: ['t1', 't2'] },
-    { id: 'u9',  name: 'Irene Nakamura', email: 'irene.nakamura@acme.com',  initials: 'IN', type: 'user',            role: 'member', status: 'active', tenantIds: ['t2'] },
-    { id: 'sa2', name: 'deploy-agent',   email: 'deploy-agent@svc.acme.com',initials: 'DA', type: 'service-account', role: 'member', status: 'active', tenantIds: ['t1', 't2'] },
-  ],
-};
+type ManagementView = 'groups' | 'roles' | 'users' | 'org-members' | 'identities';
 
 // ─── Org Members View ─────────────────────────────────────────────────────────
 
@@ -343,10 +307,14 @@ function hashStr(s: string) {
 const InviteOrgMembersDialog: React.FC<{
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onInvite: (invites: { email: string; role: 'member' | 'admin' }[]) => void;
-}> = ({ open, onOpenChange, onInvite }) => {
-  const [emailInput, setEmailInput] = useState('');
-  const [role, setRole] = useState<'member' | 'admin'>('member');
+  onInvite: (invites: { email: string; role: OrgRole }[], tenantIds: string[], tenantRoles: Record<string, OrgTenantRole>) => void;
+  isAdmin?: boolean;
+  tenants: Tenant[];
+}> = ({ open, onOpenChange, onInvite, isAdmin, tenants }) => {
+  const [emailInput, setEmailInput]     = useState('');
+  const [role, setRole]                 = useState<OrgRole>('member');
+  const [tenantIds, setTenantIds]       = useState<string[]>([]);
+  const [tenantRoles, setTenantRoles]   = useState<Record<string, OrgTenantRole>>({});
 
   const parseEmails = (raw: string) =>
     raw.split(',').map(e => e.trim()).filter(e => e.includes('@') && e.includes('.'));
@@ -354,14 +322,23 @@ const InviteOrgMembersDialog: React.FC<{
   const validEmails = parseEmails(emailInput);
   const canSubmit = validEmails.length > 0;
 
+  const toggleTenant = (tid: string) => {
+    if (tenantIds.includes(tid)) {
+      setTenantIds(prev => prev.filter(t => t !== tid));
+      setTenantRoles(prev => { const n = { ...prev }; delete n[tid]; return n; });
+    } else {
+      setTenantIds(prev => [...prev, tid]);
+      setTenantRoles(prev => ({ ...prev, [tid]: 'developer' as OrgTenantRole }));
+    }
+  };
+
   const handleSubmit = () => {
-    onInvite(validEmails.map(email => ({ email, role })));
-    setEmailInput('');
-    setRole('member');
+    onInvite(validEmails.map(email => ({ email, role })), tenantIds, tenantRoles);
+    reset();
     onOpenChange(false);
   };
 
-  const reset = () => { setEmailInput(''); setRole('member'); };
+  const reset = () => { setEmailInput(''); setRole('member'); setTenantIds([]); setTenantRoles({}); };
 
   return (
     <Dialog.Root open={open} onOpenChange={v => { if (!v) reset(); onOpenChange(v); }}>
@@ -386,7 +363,7 @@ const InviteOrgMembersDialog: React.FC<{
           </div>
 
           {/* Input + role */}
-          <div className="px-6 py-5">
+          <div className="px-6 py-5 space-y-4">
             <div className="flex items-center gap-2">
               <div className="flex-1 flex items-center px-3 h-9 rounded-lg border border-gray-6 bg-white">
                 <input
@@ -401,21 +378,21 @@ const InviteOrgMembersDialog: React.FC<{
               </div>
               <DropdownMenu.Root>
                 <DropdownMenu.Trigger asChild>
-                  <button className="flex items-center gap-1 h-9 px-3 rounded-lg border border-gray-6 bg-white text-[13px] font-medium text-gray-11 hover:bg-gray-2 transition-colors capitalize whitespace-nowrap shrink-0">
-                    {role} <ChevronDown size={12} className="text-gray-8" />
+                  <button className="flex items-center gap-1 h-9 px-3 rounded-lg border border-gray-6 bg-white text-[13px] font-medium text-gray-11 hover:bg-gray-2 transition-colors whitespace-nowrap shrink-0">
+                    {orgRoleLabel(role)} <ChevronDown size={12} className="text-gray-8" />
                   </button>
                 </DropdownMenu.Trigger>
                 <DropdownMenu.Portal>
-                  <DropdownMenu.Content align="end" sideOffset={4} className="bg-white rounded-lg shadow-xl border border-gray-5 py-1 w-[120px] z-[60] animate-in fade-in slide-in-from-top-1 duration-150">
-                    {(['member', 'admin'] as const).map(r => (
+                  <DropdownMenu.Content align="end" sideOffset={4} className="bg-white rounded-lg shadow-xl border border-gray-5 py-1 w-[150px] z-[60] animate-in fade-in slide-in-from-top-1 duration-150">
+                    {(['member', 'admin', 'platform-admin'] as const).map(r => (
                       <DropdownMenu.Item
                         key={r}
                         onClick={() => setRole(r)}
-                        className={cn('flex items-center justify-between px-3 py-1.5 text-[13px] cursor-pointer outline-none transition-colors capitalize',
+                        className={cn('flex items-center justify-between px-3 py-1.5 text-[13px] cursor-pointer outline-none transition-colors',
                           r === role ? 'text-[#5B5CE6] bg-[#0011FF08]' : 'text-gray-11 hover:bg-[#0011FF0F] hover:text-[#2E1E71]'
                         )}
                       >
-                        {r} {r === role && <Check size={12} className="text-[#5B5CE6]" />}
+                        {orgRoleLabel(r)} {r === role && <Check size={12} className="text-[#5B5CE6]" />}
                       </DropdownMenu.Item>
                     ))}
                   </DropdownMenu.Content>
@@ -423,7 +400,48 @@ const InviteOrgMembersDialog: React.FC<{
               </DropdownMenu.Root>
             </div>
             {validEmails.length > 1 && (
-              <p className="mt-2 text-[11px] text-gray-9">{validEmails.length} addresses detected</p>
+              <p className="text-[11px] text-gray-9">{validEmails.length} addresses detected</p>
+            )}
+
+            {isAdmin && tenants.length > 0 && (
+              <div className="space-y-1.5 pt-1">
+                <p className="text-[11px] font-semibold text-gray-9 uppercase tracking-wider pb-0.5">Tenant Access <span className="normal-case font-normal text-gray-7">(optional)</span></p>
+                {tenants.map(t => {
+                  const inTenant = tenantIds.includes(t.id);
+                  return (
+                    <div key={t.id} className="flex items-center gap-3">
+                      <button onClick={() => toggleTenant(t.id)} className="flex items-center gap-2.5 flex-1 min-w-0">
+                        <div className={cn('w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors', inTenant ? 'bg-[#5B5CE6] border-[#5B5CE6]' : 'border-gray-6')}>
+                          {inTenant && <Check size={10} className="text-white" strokeWidth={3} />}
+                        </div>
+                        <span className={cn('text-[13px]', inTenant ? 'text-gray-12 font-medium' : 'text-gray-9')}>{t.name}</span>
+                      </button>
+                      {inTenant && (
+                        <DropdownMenu.Root>
+                          <DropdownMenu.Trigger asChild>
+                            <button className="flex items-center gap-1 h-7 px-2.5 rounded-md border border-gray-6 text-[12px] font-medium text-gray-10 hover:bg-gray-2 transition-colors shrink-0">
+                              {orgTenantRoleLabel(tenantRoles[t.id] ?? 'developer')} <ChevronDown size={11} className="text-gray-8" />
+                            </button>
+                          </DropdownMenu.Trigger>
+                          <DropdownMenu.Portal>
+                            <DropdownMenu.Content align="end" sideOffset={4} className="bg-white rounded-lg shadow-xl border border-gray-5 py-1 w-[130px] z-[60] animate-in fade-in slide-in-from-top-1 duration-150">
+                              {ORG_TENANT_ROLES.map(r => (
+                                <DropdownMenu.Item key={r} onClick={() => setTenantRoles(prev => ({ ...prev, [t.id]: r }))}
+                                  className={cn('flex items-center justify-between px-3 py-1.5 text-[13px] cursor-pointer outline-none transition-colors',
+                                    (tenantRoles[t.id] ?? 'developer') === r ? 'text-[#5B5CE6] bg-[#0011FF08]' : 'text-gray-11 hover:bg-[#0011FF0F] hover:text-[#2E1E71]'
+                                  )}
+                                >
+                                  {orgTenantRoleLabel(r)} {(tenantRoles[t.id] ?? 'developer') === r && <Check size={12} className="text-[#5B5CE6]" />}
+                                </DropdownMenu.Item>
+                              ))}
+                            </DropdownMenu.Content>
+                          </DropdownMenu.Portal>
+                        </DropdownMenu.Root>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
 
@@ -461,36 +479,271 @@ const OrgMemberStatusBadge: React.FC<{ status: OrgMemberStatus }> = ({ status })
   );
 };
 
+// ─── Org Member Manage Access Dialog ─────────────────────────────────────────
+
+type OrgTenantRole = 'admin' | 'developer' | 'user' | 'viewer';
+const ORG_TENANT_ROLES: OrgTenantRole[] = ['admin', 'developer', 'user', 'viewer'];
+const ORG_ROLES_ORDERED: OrgRole[] = ['platform-admin', 'admin', 'member'];
+
+function orgTenantRoleLabel(r: OrgTenantRole) {
+  return r.charAt(0).toUpperCase() + r.slice(1);
+}
+
+interface OrgMemberManageAccessDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  member: OrgMember;
+  currentOrgId: string;
+  tenants: Tenant[];
+  onSave: (updated: OrgMember, newOrgId: string, tenantRoles: Record<string, OrgTenantRole>) => void;
+  isAdmin?: boolean;
+}
+
+const OrgMemberManageAccessDialog: React.FC<OrgMemberManageAccessDialogProps> = ({
+  open, onOpenChange, member, currentOrgId, tenants, onSave, isAdmin,
+}) => {
+  const [orgId, setOrgId]       = useState(currentOrgId);
+  const [role, setRole]         = useState<OrgRole>(member.role);
+  const [tenantIds, setTenantIds]     = useState<string[]>(member.tenantIds);
+  const [tenantRoles, setTenantRoles] = useState<Record<string, OrgTenantRole>>(
+    () => Object.fromEntries(member.tenantIds.map(tid => [tid, 'developer' as OrgTenantRole]))
+  );
+
+  React.useEffect(() => {
+    if (open) {
+      setOrgId(currentOrgId);
+      setRole(member.role);
+      setTenantIds([...member.tenantIds]);
+      setTenantRoles(Object.fromEntries(member.tenantIds.map(tid => [tid, 'developer' as OrgTenantRole])));
+    }
+  }, [open, member, currentOrgId]);
+
+  const palette = AVATAR_PALETTES_ORG[hashStr(member.name) % AVATAR_PALETTES_ORG.length];
+
+  const toggleTenant = (tid: string) => {
+    if (tenantIds.includes(tid)) {
+      setTenantIds(p => p.filter(t => t !== tid));
+      setTenantRoles(p => { const n = { ...p }; delete n[tid]; return n; });
+    } else {
+      setTenantIds(p => [...p, tid]);
+      setTenantRoles(p => ({ ...p, [tid]: 'developer' }));
+    }
+  };
+
+  const handleSave = () => {
+    onSave({ ...member, role, tenantIds }, orgId, tenantRoles);
+    onOpenChange(false);
+  };
+
+  const selectedOrg = INITIAL_ORGS.find(o => o.id === orgId);
+
+  return (
+    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 bg-black/40 z-50 animate-in fade-in duration-150" />
+        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl z-50 w-[480px] animate-in fade-in slide-in-from-bottom-2 duration-200 focus:outline-none">
+          <div className="px-6 pt-5 pb-4 border-b border-gray-4">
+            <div className="flex items-start justify-between">
+              <Dialog.Title className="text-[16px] font-semibold text-gray-12">Manage Access</Dialog.Title>
+              <Dialog.Close asChild>
+                <button className="w-7 h-7 rounded-md flex items-center justify-center text-gray-8 hover:bg-gray-3 hover:text-gray-11 transition-colors -mr-1 -mt-1">
+                  <X size={16} />
+                </button>
+              </Dialog.Close>
+            </div>
+            <Dialog.Description className="sr-only">Manage access for {member.name}</Dialog.Description>
+          </div>
+
+          <div className="px-6 py-5 space-y-6">
+            {/* Identity */}
+            <div>
+              <p className="text-[11px] font-semibold text-gray-9 uppercase tracking-wider mb-2.5">Identity</p>
+              <div className="flex items-center gap-3">
+                <div className={cn('w-10 h-10 flex items-center justify-center text-[14px] font-medium shrink-0',
+                  member.type === 'service-account' ? 'rounded-lg bg-gray-3 text-gray-10' : `rounded-full ${palette.bg} ${palette.text}`
+                )}>
+                  {member.initials}
+                </div>
+                <div>
+                  <p className="text-[14px] font-semibold text-gray-12 leading-tight">{member.name}</p>
+                  <p className="text-[12px] text-gray-9 mt-0.5">{member.email}</p>
+                </div>
+              </div>
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold text-gray-9 uppercase tracking-wider mb-3">Org & Platform Role</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-[11px] text-gray-9 mb-1.5">Organization</p>
+                  <DropdownMenu.Root>
+                    <DropdownMenu.Trigger asChild>
+                      <button className="w-full flex items-center justify-between h-8 px-3 rounded-lg border border-gray-6 bg-white text-[13px] font-medium text-gray-11 hover:bg-gray-2 transition-colors">
+                        {selectedOrg?.name ?? '—'} <ChevronDown size={12} className="text-gray-8 shrink-0" />
+                      </button>
+                    </DropdownMenu.Trigger>
+                    <DropdownMenu.Portal>
+                      <DropdownMenu.Content align="start" sideOffset={4} className="bg-white rounded-lg shadow-xl border border-gray-5 py-1 w-[180px] z-[60] animate-in fade-in slide-in-from-top-1 duration-150">
+                        {INITIAL_ORGS.map(o => (
+                          <DropdownMenu.Item key={o.id} onClick={() => setOrgId(o.id)}
+                            className={cn('flex items-center justify-between px-3 py-1.5 text-[13px] cursor-pointer outline-none transition-colors',
+                              o.id === orgId ? 'text-[#5B5CE6] bg-[#0011FF08]' : 'text-gray-11 hover:bg-[#0011FF0F] hover:text-[#2E1E71]'
+                            )}
+                          >
+                            {o.name} {o.id === orgId && <Check size={12} className="text-[#5B5CE6]" />}
+                          </DropdownMenu.Item>
+                        ))}
+                      </DropdownMenu.Content>
+                    </DropdownMenu.Portal>
+                  </DropdownMenu.Root>
+                </div>
+                <div>
+                  <p className="text-[11px] text-gray-9 mb-1.5">Platform Role</p>
+                  <DropdownMenu.Root>
+                    <DropdownMenu.Trigger asChild>
+                      <button className="w-full flex items-center justify-between h-8 px-3 rounded-lg border border-gray-6 bg-white text-[13px] font-medium text-gray-11 hover:bg-gray-2 transition-colors">
+                        {orgRoleLabel(role)} <ChevronDown size={12} className="text-gray-8 shrink-0" />
+                      </button>
+                    </DropdownMenu.Trigger>
+                    <DropdownMenu.Portal>
+                      <DropdownMenu.Content align="start" sideOffset={4} className="bg-white rounded-lg shadow-xl border border-gray-5 py-1 w-[160px] z-[60] animate-in fade-in slide-in-from-top-1 duration-150">
+                        {ORG_ROLES_ORDERED.map(r => (
+                          <DropdownMenu.Item key={r} onClick={() => setRole(r)}
+                            className={cn('flex items-center justify-between px-3 py-1.5 text-[13px] cursor-pointer outline-none transition-colors',
+                              r === role ? 'text-[#5B5CE6] bg-[#0011FF08]' : 'text-gray-11 hover:bg-[#0011FF0F] hover:text-[#2E1E71]'
+                            )}
+                          >
+                            {orgRoleLabel(r)} {r === role && <Check size={12} className="text-[#5B5CE6]" />}
+                          </DropdownMenu.Item>
+                        ))}
+                      </DropdownMenu.Content>
+                    </DropdownMenu.Portal>
+                  </DropdownMenu.Root>
+                </div>
+              </div>
+            </div>
+
+            {isAdmin && <div>
+              <p className="text-[11px] font-semibold text-gray-9 uppercase tracking-wider mb-3">Tenant Access</p>
+              <div className="space-y-2">
+                {tenants.map(t => {
+                  const inTenant = tenantIds.includes(t.id);
+                  return (
+                    <div key={t.id} className="flex items-center gap-3">
+                      <button onClick={() => toggleTenant(t.id)} className="flex items-center gap-2.5 flex-1 min-w-0">
+                        <div className={cn('w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors',
+                          inTenant ? 'bg-[#5B5CE6] border-[#5B5CE6]' : 'border-gray-6'
+                        )}>
+                          {inTenant && <Check size={10} className="text-white" strokeWidth={3} />}
+                        </div>
+                        <span className={cn('text-[13px]', inTenant ? 'text-gray-12 font-medium' : 'text-gray-9')}>{t.name}</span>
+                      </button>
+                      {inTenant && (
+                        <DropdownMenu.Root>
+                          <DropdownMenu.Trigger asChild>
+                            <button className="flex items-center gap-1 h-7 px-2.5 rounded-md border border-gray-6 text-[12px] font-medium text-gray-10 hover:bg-gray-2 transition-colors shrink-0">
+                              {orgTenantRoleLabel(tenantRoles[t.id] ?? 'developer')} <ChevronDown size={11} className="text-gray-8" />
+                            </button>
+                          </DropdownMenu.Trigger>
+                          <DropdownMenu.Portal>
+                            <DropdownMenu.Content align="end" sideOffset={4} className="bg-white rounded-lg shadow-xl border border-gray-5 py-1 w-[130px] z-[60] animate-in fade-in slide-in-from-top-1 duration-150">
+                              {ORG_TENANT_ROLES.map(r => (
+                                <DropdownMenu.Item key={r}
+                                  onClick={() => setTenantRoles(p => ({ ...p, [t.id]: r }))}
+                                  className={cn('flex items-center justify-between px-3 py-1.5 text-[13px] cursor-pointer outline-none transition-colors',
+                                    (tenantRoles[t.id] ?? 'developer') === r ? 'text-[#5B5CE6] bg-[#0011FF08]' : 'text-gray-11 hover:bg-[#0011FF0F] hover:text-[#2E1E71]'
+                                  )}
+                                >
+                                  {orgTenantRoleLabel(r)} {(tenantRoles[t.id] ?? 'developer') === r && <Check size={12} className="text-[#5B5CE6]" />}
+                                </DropdownMenu.Item>
+                              ))}
+                            </DropdownMenu.Content>
+                          </DropdownMenu.Portal>
+                        </DropdownMenu.Root>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>}
+          </div>
+
+          <div className="px-6 py-4 border-t border-gray-4 flex items-center justify-end gap-2">
+            <Dialog.Close asChild>
+              <button className="h-8 px-3 rounded-lg text-[13px] font-medium text-gray-11 hover:bg-gray-3 transition-colors">Cancel</button>
+            </Dialog.Close>
+            <button onClick={handleSave} className="h-8 px-4 rounded-lg text-[13px] font-medium text-white bg-[#5B5CE6] hover:bg-[#4A4BD5] transition-colors">
+              Save Changes
+            </button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+};
+
+// ─── Org Members View helpers ─────────────────────────────────────────────────
+
+interface OrgMembersFilters {
+  statuses: OrgMemberStatus[];
+  roles:    OrgRole[];
+  tenants:  string[];
+}
+const DEFAULT_ORG_FILTERS: OrgMembersFilters = { statuses: [], roles: [], tenants: [] };
+
+function toggleOrgFilter<K extends keyof OrgMembersFilters>(
+  prev: OrgMembersFilters, key: K, value: OrgMembersFilters[K][number]
+): OrgMembersFilters {
+  const arr = prev[key] as unknown[];
+  return { ...prev, [key]: arr.includes(value) ? arr.filter(v => v !== value) : [...arr, value] };
+}
+
+function countOrgFilters(f: OrgMembersFilters) {
+  return [f.statuses, f.roles, f.tenants].filter(a => a.length > 0).length;
+}
+
+// ─── Org Members View ─────────────────────────────────────────────────────────
+
 interface OrgMembersViewProps {
   orgId: string;
   tenants: Tenant[];
   onNavigateToTenantUsers: (tenantId: string) => void;
+  isAdmin?: boolean;
 }
 
-const OrgMembersView: React.FC<OrgMembersViewProps> = ({ orgId, tenants, onNavigateToTenantUsers }) => {
-  const [members, setMembers] = useState<OrgMember[]>(MOCK_ORG_MEMBERS[orgId] ?? []);
-  const [search, setSearch] = useState('');
-  const [inviteOpen, setInviteOpen] = useState(false);
+const OrgMembersView: React.FC<OrgMembersViewProps> = ({ orgId, tenants, onNavigateToTenantUsers, isAdmin }) => {
+  const [members, setMembers]         = useState<OrgMember[]>(MOCK_ORG_MEMBERS[orgId] ?? []);
+  const [search, setSearch]           = useState('');
+  const [inviteOpen, setInviteOpen]   = useState(false);
+  const [filters, setFilters]         = useState<OrgMembersFilters>(DEFAULT_ORG_FILTERS);
+  const [filterOpen, setFilterOpen]   = useState(false);
+  const [manageEntry, setManageEntry] = useState<OrgMember | null>(null);
+  const [manageOpen, setManageOpen]   = useState(false);
 
-  const filtered = members.filter(m =>
-    m.name.toLowerCase().includes(search.toLowerCase()) ||
-    m.email.toLowerCase().includes(search.toLowerCase())
-  );
+  const activeCount = countOrgFilters(filters);
 
-  const handleRoleChange = (memberId: string, role: 'member' | 'admin') =>
+  const filtered = members.filter(m => {
+    if (filters.statuses.length > 0 && !filters.statuses.includes(m.status))                    return false;
+    if (filters.roles.length    > 0 && !filters.roles.includes(m.role))                         return false;
+    if (filters.tenants.length  > 0 && !m.tenantIds.some(t => filters.tenants.includes(t)))     return false;
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q);
+  });
+
+  const handleRoleChange = (memberId: string, role: OrgRole) =>
     setMembers(prev => prev.map(m => m.id === memberId ? { ...m, role } : m));
 
   const handleRemove = (memberId: string) =>
     setMembers(prev => prev.filter(m => m.id !== memberId));
 
-  const handleInvite = (invites: { email: string; role: 'member' | 'admin' }[]) => {
+  const handleInvite = (invites: { email: string; role: OrgRole }[], tenantIds: string[]) => {
     const newMembers: OrgMember[] = invites.map((inv, i) => {
       const parts = inv.email.split('@')[0].split('.');
       const name = parts.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
       const initials = parts.map(p => p.charAt(0).toUpperCase()).join('').slice(0, 2);
       return {
         id: `inv-${Date.now()}-${i}`, name, email: inv.email,
-        initials, type: 'user' as const, role: inv.role, status: 'pending' as OrgMemberStatus, tenantIds: [],
+        initials, type: 'user' as const, role: inv.role, status: 'pending' as OrgMemberStatus, tenantIds,
       };
     });
     setMembers(prev => [...prev, ...newMembers]);
@@ -498,34 +751,137 @@ const OrgMembersView: React.FC<OrgMembersViewProps> = ({ orgId, tenants, onNavig
 
   const tenantName = (id: string) => tenants.find(t => t.id === id)?.name ?? id;
 
+  const OrgFilterCheckbox: React.FC<{ checked: boolean; label: string; onToggle: () => void }> = ({ checked, label, onToggle }) => (
+    <button onClick={onToggle} className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded hover:bg-gray-2 transition-colors text-left">
+      <div className={cn('w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors', checked ? 'bg-[#5B5CE6] border-[#5B5CE6]' : 'border-gray-6')}>
+        {checked && <Check size={10} className="text-white" strokeWidth={3} />}
+      </div>
+      <span className="text-[13px] text-gray-11">{label}</span>
+    </button>
+  );
+
   return (
     <div className="flex flex-col h-full">
-      <div className="px-6 py-3 border-b border-gray-4 shrink-0 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 px-3 h-8 rounded-lg border border-gray-6 bg-white max-w-[320px] flex-1">
+      <div className="px-6 py-3 border-b border-gray-4 shrink-0 flex items-center gap-2">
+        <div className="flex items-center gap-2 px-3 h-8 rounded-lg border border-gray-6 bg-white max-w-[300px] flex-1">
           <Search size={13} className="text-gray-8 shrink-0" />
           <input
             type="text"
-            placeholder="Search members..."
+            placeholder="Search identities..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="flex-1 bg-transparent text-[13px] text-gray-12 placeholder:text-gray-8 outline-none"
           />
         </div>
-        <button
-          onClick={() => setInviteOpen(true)}
-          className="h-8 px-3 rounded-lg text-[13px] font-medium text-white bg-[#5B5CE6] hover:bg-[#4A4BD5] transition-colors flex items-center gap-1.5 shrink-0"
-        >
-          <Plus size={14} /> Add Member
-        </button>
+
+        <Popover.Root open={filterOpen} onOpenChange={setFilterOpen}>
+          <Popover.Trigger asChild>
+            <button className={cn(
+              'h-8 px-3 rounded-lg text-[13px] font-medium flex items-center gap-1.5 transition-colors shrink-0',
+              activeCount > 0 ? 'text-[#5B5CE6] hover:bg-[#EEEEFF]' : 'text-gray-10 hover:bg-gray-3',
+            )}>
+              <SlidersHorizontal size={13} />
+              Filters
+              {activeCount > 0 && (
+                <span className="min-w-[18px] h-[18px] rounded-full bg-[#5B5CE6] text-white text-[10px] font-semibold flex items-center justify-center px-1">
+                  {activeCount}
+                </span>
+              )}
+            </button>
+          </Popover.Trigger>
+          <Popover.Portal>
+            <Popover.Content align="start" sideOffset={6} className="bg-white rounded-xl shadow-xl border border-gray-5 w-[210px] z-50 animate-in fade-in slide-in-from-top-1 duration-150 pb-2">
+              <div className="flex items-center justify-between px-3 pt-3 pb-2 border-b border-gray-4">
+                <span className="text-[13px] font-semibold text-gray-12">Filters</span>
+                <div className="flex items-center gap-1">
+                  {activeCount > 0 && (
+                    <button onClick={() => setFilters(DEFAULT_ORG_FILTERS)} className="text-[11px] text-[#5B5CE6] hover:underline">Clear all</button>
+                  )}
+                  <Popover.Close asChild>
+                    <button className="w-6 h-6 rounded flex items-center justify-center text-gray-8 hover:bg-gray-3 hover:text-gray-11 transition-colors ml-1">
+                      <X size={13} />
+                    </button>
+                  </Popover.Close>
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold text-gray-9 uppercase tracking-wider px-3 pt-3 pb-1">Status</p>
+                <div className="px-1.5 space-y-0.5">
+                  <OrgFilterCheckbox checked={filters.statuses.includes('active')}   label="Active"   onToggle={() => setFilters(p => toggleOrgFilter(p, 'statuses', 'active'))} />
+                  <OrgFilterCheckbox checked={filters.statuses.includes('inactive')} label="Inactive" onToggle={() => setFilters(p => toggleOrgFilter(p, 'statuses', 'inactive'))} />
+                  <OrgFilterCheckbox checked={filters.statuses.includes('pending')}  label="Pending"  onToggle={() => setFilters(p => toggleOrgFilter(p, 'statuses', 'pending'))} />
+                </div>
+                <p className="text-[10px] font-semibold text-gray-9 uppercase tracking-wider px-3 pt-3 pb-1">Role</p>
+                <div className="px-1.5 space-y-0.5">
+                  <OrgFilterCheckbox checked={filters.roles.includes('platform-admin')} label="Platform Admin" onToggle={() => setFilters(p => toggleOrgFilter(p, 'roles', 'platform-admin'))} />
+                  <OrgFilterCheckbox checked={filters.roles.includes('admin')}          label="Admin"          onToggle={() => setFilters(p => toggleOrgFilter(p, 'roles', 'admin'))} />
+                  <OrgFilterCheckbox checked={filters.roles.includes('member')}         label="Member"         onToggle={() => setFilters(p => toggleOrgFilter(p, 'roles', 'member'))} />
+                </div>
+                <p className="text-[10px] font-semibold text-gray-9 uppercase tracking-wider px-3 pt-3 pb-1">Tenant</p>
+                <div className="px-1.5 space-y-0.5 pb-1">
+                  {tenants.map(t => (
+                    <OrgFilterCheckbox key={t.id} checked={filters.tenants.includes(t.id)} label={t.name} onToggle={() => setFilters(p => toggleOrgFilter(p, 'tenants', t.id))} />
+                  ))}
+                </div>
+              </div>
+            </Popover.Content>
+          </Popover.Portal>
+        </Popover.Root>
+
+        {activeCount > 0 && (
+          <button onClick={() => setFilters(DEFAULT_ORG_FILTERS)} className="text-[12px] text-gray-9 hover:text-gray-12 transition-colors underline shrink-0">Clear</button>
+        )}
+
+        <div className="ml-auto">
+          <button
+            onClick={() => setInviteOpen(true)}
+            className="h-8 px-3 rounded-lg text-[13px] font-medium text-white bg-[#5B5CE6] hover:bg-[#4A4BD5] transition-colors flex items-center gap-1.5 shrink-0"
+          >
+            <Plus size={14} /> Add Identity
+          </button>
+        </div>
       </div>
 
-      <InviteOrgMembersDialog open={inviteOpen} onOpenChange={setInviteOpen} onInvite={handleInvite} />
+      <InviteOrgMembersDialog open={inviteOpen} onOpenChange={setInviteOpen} onInvite={handleInvite} isAdmin={isAdmin} tenants={tenants} />
+
+      {manageEntry && (
+        <OrgMemberManageAccessDialog
+          open={manageOpen}
+          onOpenChange={o => {
+            setManageOpen(o);
+            if (!o) {
+              setTimeout(() => setManageEntry(null), 300);
+              // Workaround: Radix Dialog + nested DropdownMenu can leave
+              // body.style.pointerEvents stuck at 'none' after close.
+              setTimeout(() => {
+                if (document.body.style.pointerEvents === 'none') {
+                  document.body.style.pointerEvents = '';
+                }
+              }, 400);
+            }
+          }}
+          member={manageEntry}
+          currentOrgId={orgId}
+          tenants={tenants}
+          isAdmin={isAdmin}
+          onSave={(updated, _newOrgId, _tenantRoles) => {
+            setMembers(prev => prev.map(m => m.id === updated.id ? updated : m));
+            setManageOpen(false);
+            setTimeout(() => setManageEntry(null), 300);
+            setTimeout(() => {
+              if (document.body.style.pointerEvents === 'none') {
+                document.body.style.pointerEvents = '';
+              }
+            }, 400);
+          }}
+        />
+      )}
 
       <div className="flex-1 min-h-0 overflow-y-auto">
         {filtered.length === 0 ? (
           <div className="px-6 py-12 text-center">
             <Users size={28} className="text-gray-6 mx-auto mb-3" />
-            <p className="text-[13px] text-gray-9">{search ? 'No members match your search' : 'No members yet'}</p>
+            <p className="text-[13px] text-gray-9">{search || activeCount > 0 ? 'No identities match your filters' : 'No members yet'}</p>
           </div>
         ) : (
           <div className="px-6 py-3">
@@ -534,7 +890,7 @@ const OrgMembersView: React.FC<OrgMembersViewProps> = ({ orgId, tenants, onNavig
                 <tr className="border-b border-gray-4">
                   <th className="text-left text-[11px] font-medium text-gray-9 uppercase tracking-wider pb-2.5 pr-3">Identity</th>
                   <th className="text-left text-[11px] font-medium text-gray-9 uppercase tracking-wider pb-2.5 pr-3 w-[100px]">Status</th>
-                  <th className="text-left text-[11px] font-medium text-gray-9 uppercase tracking-wider pb-2.5 pr-3 w-[110px]">Role</th>
+                  <th className="text-left text-[11px] font-medium text-gray-9 uppercase tracking-wider pb-2.5 pr-3 w-[150px]">Role</th>
                   <th className="text-left text-[11px] font-medium text-gray-9 uppercase tracking-wider pb-2.5">Tenants</th>
                   <th className="w-[40px]" />
                 </tr>
@@ -543,7 +899,7 @@ const OrgMembersView: React.FC<OrgMembersViewProps> = ({ orgId, tenants, onNavig
                 {filtered.map(member => {
                   const palette = AVATAR_PALETTES_ORG[hashStr(member.name) % AVATAR_PALETTES_ORG.length];
                   return (
-                    <tr key={member.id} className="border-b border-gray-3 last:border-b-0 group">
+                    <tr key={member.id} className="border-b border-gray-3 last:border-b-0 hover:bg-gray-2 transition-colors group">
                       <td className="py-2.5 pr-3">
                         <div className="flex items-center gap-2.5">
                           <div className={cn(
@@ -571,21 +927,21 @@ const OrgMembersView: React.FC<OrgMembersViewProps> = ({ orgId, tenants, onNavig
                       <td className="py-2.5 pr-3">
                         <DropdownMenu.Root>
                           <DropdownMenu.Trigger asChild>
-                            <button className="flex items-center gap-1 px-2 py-1 rounded-md text-[12px] font-medium text-gray-10 hover:bg-gray-3 transition-colors capitalize">
-                              {member.role} <ChevronDown size={11} className="text-gray-8" />
+                            <button className="flex items-center gap-1 px-2 py-1 rounded-md text-[12px] font-medium text-gray-10 hover:bg-gray-3 transition-colors">
+                              {orgRoleLabel(member.role)} <ChevronDown size={11} className="text-gray-8" />
                             </button>
                           </DropdownMenu.Trigger>
                           <DropdownMenu.Portal>
-                            <DropdownMenu.Content align="start" sideOffset={4} className="bg-white rounded-lg shadow-xl border border-gray-5 py-1 w-[120px] z-50 animate-in fade-in slide-in-from-top-1 duration-150">
-                              {(['member', 'admin'] as const).map(r => (
+                            <DropdownMenu.Content align="start" sideOffset={4} className="bg-white rounded-lg shadow-xl border border-gray-5 py-1 w-[150px] z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                              {ORG_ROLES_ORDERED.map(r => (
                                 <DropdownMenu.Item
                                   key={r}
                                   onClick={() => handleRoleChange(member.id, r)}
-                                  className={cn('flex items-center justify-between px-3 py-1.5 text-[13px] cursor-pointer outline-none transition-colors capitalize',
+                                  className={cn('flex items-center justify-between px-3 py-1.5 text-[13px] cursor-pointer outline-none transition-colors',
                                     r === member.role ? 'text-[#5B5CE6] bg-[#0011FF08]' : 'text-gray-11 hover:bg-[#0011FF0F] hover:text-[#2E1E71]'
                                   )}
                                 >
-                                  {r}
+                                  {orgRoleLabel(r)}
                                   {r === member.role && <Check size={12} className="text-[#5B5CE6]" />}
                                 </DropdownMenu.Item>
                               ))}
@@ -596,7 +952,7 @@ const OrgMembersView: React.FC<OrgMembersViewProps> = ({ orgId, tenants, onNavig
                       <td className="py-2.5">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                           {member.tenantIds.length === 0 ? (
-                            <span className="text-[12px] text-gray-8 italic">No tenants</span>
+                            <span className="text-[12px] text-gray-8 italic">None</span>
                           ) : member.tenantIds.map(tid => (
                             <button
                               key={tid}
@@ -618,16 +974,20 @@ const OrgMembersView: React.FC<OrgMembersViewProps> = ({ orgId, tenants, onNavig
                           <DropdownMenu.Portal>
                             <DropdownMenu.Content align="end" sideOffset={4} className="bg-white rounded-lg shadow-xl border border-gray-5 py-1 w-[160px] z-50 animate-in fade-in slide-in-from-top-1 duration-150">
                               <DropdownMenu.Item
-                                onClick={() => handleRemove(member.id)}
-                                className="flex items-center gap-2 px-3 py-1.5 text-[13px] text-gray-11 hover:bg-gray-2 cursor-pointer outline-none transition-colors"
+                                onSelect={(e) => {
+                                  e.preventDefault();
+                                  setManageEntry(member);
+                                  setTimeout(() => setManageOpen(true), 0);
+                                }}
+                                className="flex items-center gap-2 px-3 py-1.5 text-[13px] text-gray-11 hover:bg-[#0011FF0F] hover:text-[#2E1E71] cursor-pointer outline-none transition-colors"
                               >
-                                Deactivate User
+                                Manage access
                               </DropdownMenu.Item>
                               <DropdownMenu.Item
                                 onClick={() => handleRemove(member.id)}
                                 className="flex items-center gap-2 px-3 py-1.5 text-[13px] text-red-10 hover:bg-red-2 cursor-pointer outline-none transition-colors"
                               >
-                                Remove User
+                                Remove
                               </DropdownMenu.Item>
                             </DropdownMenu.Content>
                           </DropdownMenu.Portal>
@@ -679,14 +1039,16 @@ interface ControlPlaneLeftSidebarProps {
   onUpdateTenants: (tenants: Tenant[]) => void;
   isAdmin: boolean;
   headerStyle?: 'logo' | 'back-button';
-  tenantCrudOnly?: boolean;
 }
 
-const ControlPlaneLeftSidebar: React.FC<ControlPlaneLeftSidebarProps> = ({ activeView, activeOrgId, onSetActiveView, onNavigateOrg, showUsers, tenants, onUpdateTenants, isAdmin, headerStyle = 'logo', tenantCrudOnly = false }) => {
+const ControlPlaneLeftSidebar: React.FC<ControlPlaneLeftSidebarProps> = ({ activeView, activeOrgId, onSetActiveView, onNavigateOrg, showUsers, tenants, onUpdateTenants, isAdmin, headerStyle = 'logo' }) => {
   const [orgs, setOrgs] = useState<Org[]>(INITIAL_ORGS);
   const [activeTenantId, setActiveTenantId] = useState('t1');
   const [openAccordions, setOpenAccordions] = useState<Set<string>>(new Set(['t1', 'o1']));
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+  const toggleSection = (id: string) =>
+    setCollapsedSections(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   // Dialog — shared for both orgs and tenants
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -762,7 +1124,7 @@ const ControlPlaneLeftSidebar: React.FC<ControlPlaneLeftSidebarProps> = ({ activ
     : orgs.find(o => o.id === archiveTargetId)?.name;
 
   const renderTenantNavItems = (tenantId: string) => (
-    <div className="pl-2 mt-0.5 space-y-0.5 border-l border-gray-5 ml-3">
+    <div className="pl-2 mt-0 border-l border-gray-5 ml-3">
       {tenantNavItems.map(({ value, label }) => (
         <button
           key={value}
@@ -781,7 +1143,7 @@ const ControlPlaneLeftSidebar: React.FC<ControlPlaneLeftSidebarProps> = ({ activ
   );
 
   const renderOrgNavItems = (orgId: string) => (
-    <div className="pl-2 mt-0.5 border-l border-gray-5 ml-3">
+    <div className="pl-2 mt-0 border-l border-gray-5 ml-3">
       <button
         onClick={() => onNavigateOrg(orgId)}
           className={cn(
@@ -798,20 +1160,17 @@ const ControlPlaneLeftSidebar: React.FC<ControlPlaneLeftSidebarProps> = ({ activ
 
   const renderEntityRow = (entity: Tenant | Org, entityType: 'org' | 'tenant', readonly = false) => {
     const menuId = `${entityType}-${entity.id}`;
-    const hideSubs = tenantCrudOnly && entityType === 'tenant';
     return (
-      <div key={entity.id} className="mb-0.5">
+      <div key={entity.id}>
         <div className="group/entity flex items-center">
           <button
             onClick={() => {
-              if (!hideSubs) toggleAccordion(entity.id);
+              toggleAccordion(entity.id);
               if (entityType === 'tenant') setActiveTenantId(entity.id);
             }}
             className="flex-1 flex items-center gap-2 px-2 py-1 rounded-md hover:bg-gray-2 transition-colors min-w-0"
           >
-            {!hideSubs && (
-              <ChevronDown size={13} className={cn('text-gray-7 shrink-0 transition-transform duration-150', !openAccordions.has(entity.id) && '-rotate-90')} />
-            )}
+            <ChevronDown size={13} className={cn('text-gray-7 shrink-0 transition-transform duration-150', !openAccordions.has(entity.id) && '-rotate-90')} />
             <span className="text-[13px] font-medium text-gray-11 truncate">{entity.name}</span>
           </button>
           <DropdownMenu.Root open={menuOpenId === menuId} onOpenChange={open => setMenuOpenId(open ? menuId : null)}>
@@ -837,21 +1196,46 @@ const ControlPlaneLeftSidebar: React.FC<ControlPlaneLeftSidebarProps> = ({ activ
             </DropdownMenu.Portal>
           </DropdownMenu.Root>
         </div>
-        {!hideSubs && openAccordions.has(entity.id) && (
+        {openAccordions.has(entity.id) && (
           entityType === 'tenant' ? renderTenantNavItems(entity.id) : renderOrgNavItems(entity.id)
         )}
       </div>
     );
   };
 
-  const SectionHeader: React.FC<{ label: string; icon: React.ReactNode; onAdd?: () => void; mt?: boolean }> = ({ label, icon, onAdd, mt }) => (
-    <div className={cn('flex items-center justify-between pl-2 py-1 mb-0.5', mt && 'mt-3')}>
-      <div className="flex items-center gap-1.5 text-gray-12">
-        {icon}
-        <span className="text-[13px] font-medium text-gray-12">{label}</span>
-      </div>
+  const SectionHeader: React.FC<{
+    label: string;
+    icon: React.ReactNode;
+    onAdd?: () => void;
+    collapsed?: boolean;
+    onToggle?: () => void;
+  }> = ({ label, icon, onAdd, collapsed, onToggle }) => (
+    <div className="flex items-center justify-between pl-2 py-1">
+      {onToggle ? (
+        <button
+          onClick={onToggle}
+          className="flex items-center gap-1.5 text-gray-12 group/hdr flex-1 min-w-0"
+        >
+          <span className="relative w-[13px] h-[13px] shrink-0 flex items-center justify-center">
+            <span className="absolute transition-opacity duration-100 group-hover/hdr:opacity-0">{icon}</span>
+            <ChevronDown
+              size={13}
+              className={cn(
+                'absolute opacity-0 group-hover/hdr:opacity-100 transition-all duration-100',
+                collapsed && '-rotate-90',
+              )}
+            />
+          </span>
+          <span className="text-[13px] font-medium text-gray-12">{label}</span>
+        </button>
+      ) : (
+        <div className="flex items-center gap-1.5 text-gray-12">
+          {icon}
+          <span className="text-[13px] font-medium text-gray-12">{label}</span>
+        </div>
+      )}
       {onAdd && (
-        <button onClick={onAdd} className="w-6 h-6 rounded flex items-center justify-center text-gray-10 hover:bg-gray-3 hover:text-gray-12 transition-colors mr-1 shrink-0">
+        <button onClick={e => { e.stopPropagation(); onAdd(); }} className="w-6 h-6 rounded flex items-center justify-center text-gray-10 hover:bg-gray-3 hover:text-gray-12 transition-colors mr-1 shrink-0">
           <Plus size={12} />
         </button>
       )}
@@ -876,26 +1260,79 @@ const ControlPlaneLeftSidebar: React.FC<ControlPlaneLeftSidebarProps> = ({ activ
       )}
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-1 overflow-y-auto">
-        {isAdmin && (
-          <>
-            <SectionHeader label="Orgs" icon={<Building2 size={13} />} onAdd={() => openDialog('org', 'create')} />
-            {orgs.map(org => renderEntityRow(org, 'org'))}
-          </>
-        )}
-        <SectionHeader label="Tenants" icon={<Layers size={13} />} onAdd={isAdmin ? () => openDialog('tenant', 'create') : undefined} mt={isAdmin} />
-        {tenants.map(tenant => renderEntityRow(tenant, 'tenant', !isAdmin))}
+      <nav className="flex-1 px-3 py-3 overflow-y-auto">
+        <div className="flex flex-col">
+          <button
+            onClick={() => onSetActiveView('identities')}
+            className={cn(
+              'w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-[13px] font-medium transition-colors',
+              activeView === 'identities'
+                ? 'bg-[#EEEEFF] text-[#5B5CE6]'
+                : 'text-gray-12 hover:bg-gray-2',
+            )}
+          >
+            <Users size={14} className="shrink-0" />
+            All Identities
+          </button>
+
+          {isAdmin && (
+            <>
+              <SectionHeader
+                label="Orgs"
+                icon={<Building2 size={13} />}
+                onAdd={() => openDialog('org', 'create')}
+                collapsed={collapsedSections.has('orgs')}
+                onToggle={() => toggleSection('orgs')}
+              />
+              {!collapsedSections.has('orgs') && orgs.map(org => renderEntityRow(org, 'org'))}
+            </>
+          )}
+          <SectionHeader
+            label="Tenants"
+            icon={<Layers size={13} />}
+            onAdd={isAdmin ? () => openDialog('tenant', 'create') : undefined}
+            collapsed={collapsedSections.has('tenants')}
+            onToggle={() => toggleSection('tenants')}
+          />
+          {!collapsedSections.has('tenants') && tenants.map(tenant => renderEntityRow(tenant, 'tenant', !isAdmin))}
+        </div>
       </nav>
 
       {/* User footer */}
       <div className="px-3 py-3 border-t border-gray-4 shrink-0">
-        <div className="flex items-center gap-2.5 px-2 py-1">
-          <div className="w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-medium shrink-0" style={{ background: BRAND_LIGHT, color: BRAND }}>C</div>
-          <div className="min-w-0">
-            <p className="text-[12px] font-medium text-gray-12 truncate">César Neri</p>
-            <p className="text-[11px] text-gray-9 truncate">cesar.neri@scale.com</p>
-          </div>
-        </div>
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger asChild>
+            <button className="w-full flex items-center gap-2.5 px-2 py-1 rounded-md hover:bg-gray-2 transition-colors text-left">
+              <div className="w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-medium shrink-0" style={{ background: BRAND_LIGHT, color: BRAND }}>C</div>
+              <div className="min-w-0">
+                <p className="text-[12px] font-medium text-gray-12 truncate">César Neri</p>
+                <p className="text-[11px] text-gray-9 truncate">cesar.neri@scale.com</p>
+              </div>
+            </button>
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content
+              side="top"
+              align="start"
+              sideOffset={6}
+              className="bg-white rounded-xl shadow-xl border border-gray-5 py-1.5 w-[200px] z-50 animate-in fade-in slide-in-from-bottom-1 duration-150"
+            >
+              <DropdownMenu.Item className="flex items-center gap-2.5 px-3 py-2 text-[13px] text-gray-11 hover:bg-gray-2 hover:text-gray-12 cursor-pointer outline-none transition-colors">
+                <User size={14} className="shrink-0 text-gray-9" />
+                Profile
+              </DropdownMenu.Item>
+              <DropdownMenu.Item className="flex items-center gap-2.5 px-3 py-2 text-[13px] text-gray-11 hover:bg-gray-2 hover:text-gray-12 cursor-pointer outline-none transition-colors">
+                <KeyRound size={14} className="shrink-0 text-gray-9" />
+                API Key
+              </DropdownMenu.Item>
+              <DropdownMenu.Separator className="h-px bg-gray-4 my-1" />
+              <DropdownMenu.Item className="flex items-center gap-2.5 px-3 py-2 text-[13px] text-red-10 hover:bg-red-2 cursor-pointer outline-none transition-colors">
+                <LogOut size={14} className="shrink-0" />
+                Logout
+              </DropdownMenu.Item>
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
       </div>
 
       {/* Create / Rename dialog */}
@@ -1098,6 +1535,7 @@ const ManagementPanel: React.FC<ManagementPanelProps> = ({ groups, onUpdateGroup
             {activeView === 'groups' ? 'Groups'
               : activeView === 'users' ? 'Members'
               : activeView === 'roles' ? 'Roles'
+              : activeView === 'identities' ? 'Identities'
               : 'Identities'}
           </h1>
         </div>
@@ -1166,12 +1604,20 @@ const ManagementPanel: React.FC<ManagementPanelProps> = ({ groups, onUpdateGroup
       )}
       {activeView === 'org-members' && activeOrgId && (
         <div className="flex-1 bg-white min-h-0">
-          <OrgMembersView key={activeOrgId} orgId={activeOrgId} tenants={tenants} onNavigateToTenantUsers={onNavigateToTenantUsers} />
+          <OrgMembersView key={activeOrgId} orgId={activeOrgId} tenants={tenants} onNavigateToTenantUsers={onNavigateToTenantUsers} isAdmin={isAdmin} />
         </div>
       )}
       {activeView === 'users' && showUsers && (
         <div className="flex-1 bg-white min-h-0">
-          <UsersManagement onNavigateToGroup={handleNavigateToGroup} onNavigateToOrg={handleNavigateToOrg} isAdmin={isAdmin} />
+          <UsersManagement onNavigateToGroup={handleNavigateToGroup} onNavigateToOrg={handleNavigateToOrg} isAdmin={isAdmin} tenants={tenants} />
+        </div>
+      )}
+      {activeView === 'identities' && (
+        <div className="flex-1 bg-white min-h-0">
+          <IdentitiesManagement
+            onNavigateToOrg={handleNavigateToOrg}
+            onNavigateToTenant={onNavigateToTenantUsers}
+          />
         </div>
       )}
 
@@ -1202,7 +1648,7 @@ const ManagementPanel: React.FC<ManagementPanelProps> = ({ groups, onUpdateGroup
 const GroupRoleManagement: React.FC = () => {
   const { debugMode } = useDebugMode();
   const { params } = useTweakpane(
-    { App: 'IAM Dashboard', isAdmin: true, tenantCrudOnly: false },
+    { App: 'IAM Dashboard', isAdmin: true },
     { App: { options: { 'IAM Dashboard': 'IAM Dashboard', 'Spark': 'Spark' } } },
     {
       alwaysVisible: true,
@@ -1215,7 +1661,7 @@ const GroupRoleManagement: React.FC = () => {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [groups, setGroups] = useState<Group[]>(INITIAL_GROUPS);
   const [tenants, setTenants] = useState<Tenant[]>(INITIAL_TENANTS);
-  const [activeView, setActiveView] = useState<ManagementView>('groups');
+  const [activeView, setActiveView] = useState<ManagementView>('identities');
   const [activeOrgId, setActiveOrgId] = useState<string | null>(null);
   const navRef = useRef<HTMLDivElement>(null);
 
@@ -1255,7 +1701,6 @@ const GroupRoleManagement: React.FC = () => {
               onUpdateTenants={setTenants}
               isAdmin={isAdmin}
               headerStyle={headerStyle}
-              tenantCrudOnly={params.tenantCrudOnly as boolean}
             />
             <div className="flex-1 flex flex-col min-w-0 min-h-0">
               <ManagementPanel

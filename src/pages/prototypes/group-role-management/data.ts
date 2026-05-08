@@ -261,6 +261,7 @@ export type TenantUser = {
   groups: string[];
   createdAt: string;
   orgName?: string;
+  tenantIds?: string[];
 };
 
 export const TENANT_USERS: TenantUser[] = [
@@ -279,6 +280,60 @@ export const TENANT_USERS: TenantUser[] = [
   { id: 'sa2', name: 'deploy-agent',    email: 'deploy-agent@svc.acme.com',initials: 'DA', type: 'service-account', status: 'active',   role: 'developer', lastActive: '2026-04-16', groups: ['Data Science Team'], createdAt: '2025-02-01', orgName: 'Beta Org' },
   { id: 'sa3', name: 'monitoring-svc',  email: 'monitoring@svc.acme.com',  initials: 'MS', type: 'service-account', status: 'active',   role: 'user',      lastActive: '2026-04-15', groups: ['ML Operations'], createdAt: '2025-02-15', orgName: 'Acme Org' },
 ];
+
+// ─── Org / Tenant Structure ───────────────────────────────────────────────────
+
+export interface Tenant { id: string; name: string; }
+export interface Org    { id: string; name: string; }
+
+export const INITIAL_TENANTS: Tenant[] = [
+  { id: 't1', name: 'Tenant 1' },
+  { id: 't2', name: 'Tenant 2' },
+];
+
+export const INITIAL_ORGS: Org[] = [
+  { id: 'o1', name: 'Acme Org' },
+  { id: 'o2', name: 'Beta Org' },
+];
+
+export type OrgMemberStatus = 'active' | 'inactive' | 'pending';
+export type OrgRole = 'member' | 'admin' | 'platform-admin';
+
+export interface OrgMember {
+  id: string;
+  name: string;
+  email: string;
+  initials: string;
+  type: 'user' | 'service-account';
+  role: OrgRole;
+  status: OrgMemberStatus;
+  tenantIds: string[];
+}
+
+export const MOCK_ORG_MEMBERS: Record<string, OrgMember[]> = {
+  o1: [
+    { id: 'u1',  name: 'Alice Chen',      email: 'alice.chen@acme.com',      initials: 'AC', type: 'user',            role: 'platform-admin', status: 'active',   tenantIds: ['t1', 't2'] },
+    { id: 'u2',  name: 'Bob Martinez',    email: 'bob.martinez@acme.com',    initials: 'BM', type: 'user',            role: 'admin',          status: 'active',   tenantIds: ['t1', 't2'] },
+    { id: 'u3',  name: 'Carol Singh',     email: 'carol.singh@acme.com',     initials: 'CS', type: 'user',            role: 'member',         status: 'active',   tenantIds: ['t1'] },
+    { id: 'u6',  name: 'Frank Liu',       email: 'frank.liu@acme.com',       initials: 'FL', type: 'user',            role: 'member',         status: 'active',   tenantIds: ['t1'] },
+    { id: 'u8',  name: 'Henry Patel',     email: 'henry.patel@acme.com',     initials: 'HP', type: 'user',            role: 'member',         status: 'inactive', tenantIds: ['t2'] },
+    { id: 'u11', name: 'Karen Lee',       email: 'karen.lee@acme.com',       initials: 'KL', type: 'user',            role: 'member',         status: 'active',   tenantIds: [] },
+    { id: 'sa1', name: 'ci-pipeline-bot', email: 'ci-pipeline@svc.acme.com', initials: 'CI', type: 'service-account', role: 'member',         status: 'active',   tenantIds: ['t1', 't2'] },
+    { id: 'sa3', name: 'monitoring-svc',  email: 'monitoring@svc.acme.com',  initials: 'MS', type: 'service-account', role: 'member',         status: 'active',   tenantIds: ['t1'] },
+  ],
+  o2: [
+    { id: 'u4',  name: 'David Kim',      email: 'david.kim@acme.com',        initials: 'DK', type: 'user',            role: 'platform-admin', status: 'active', tenantIds: ['t1', 't2'] },
+    { id: 'u5',  name: 'Eve Thompson',   email: 'eve.thompson@acme.com',     initials: 'ET', type: 'user',            role: 'member',         status: 'active', tenantIds: ['t1'] },
+    { id: 'u7',  name: 'Grace Okafor',   email: 'grace.okafor@acme.com',     initials: 'GO', type: 'user',            role: 'member',         status: 'active', tenantIds: ['t1', 't2'] },
+    { id: 'u9',  name: 'Irene Nakamura', email: 'irene.nakamura@acme.com',   initials: 'IN', type: 'user',            role: 'member',         status: 'active', tenantIds: ['t2'] },
+    { id: 'sa2', name: 'deploy-agent',   email: 'deploy-agent@svc.acme.com', initials: 'DA', type: 'service-account', role: 'member',         status: 'active', tenantIds: ['t1', 't2'] },
+  ],
+};
+
+export function orgRoleLabel(role: OrgRole): string {
+  if (role === 'platform-admin') return 'Platform Admin';
+  return role.charAt(0).toUpperCase() + role.slice(1);
+}
 
 export function getPermissionLabel(permId: string): string {
   return ALL_PERMISSIONS.find(p => p.id === permId)?.label ?? permId;

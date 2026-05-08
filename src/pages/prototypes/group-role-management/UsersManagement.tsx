@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { Search, Globe, ArrowUpDown, Users, Plus, Mail, MoreHorizontal, Check, X, ChevronDown } from 'lucide-react';
+import { Search, Globe, ArrowUpDown, Users, Plus, Mail, MoreHorizontal, Check, X, ChevronDown, SlidersHorizontal } from 'lucide-react';
 import * as ScrollArea from '@radix-ui/react-scroll-area';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import * as Popover from '@radix-ui/react-popover';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import * as Dialog from '@radix-ui/react-dialog';
 import { cn } from '@/lib/utils';
-import { TENANT_USERS, type TenantUser } from './data';
+import { TENANT_USERS, INITIAL_ORGS, INITIAL_TENANTS, type TenantUser, type Tenant } from './data';
 
 const MAX_VISIBLE_GROUPS = 2;
 
@@ -244,7 +244,7 @@ const UserAvatar: React.FC<{ user: TenantUser }> = ({ user }) => {
 const GroupChip: React.FC<{ name: string; onNavigate?: (name: string) => void }> = ({ name, onNavigate }) => (
   <button
     onClick={(e) => { e.stopPropagation(); onNavigate?.(name); }}
-    className="text-[11px] text-[#5B5CE6] hover:underline transition-colors cursor-pointer"
+    className="text-[11px] text-left text-[#5B5CE6] hover:underline transition-colors cursor-pointer"
   >
     {name}
   </button>
@@ -306,21 +306,245 @@ const GroupsCell: React.FC<{ groups: string[]; onNavigateToGroup?: (name: string
 type SortField = 'name' | 'email' | 'status' | 'createdAt' | 'groups' | 'role' | 'orgName';
 type SortDir = 'asc' | 'desc';
 
+// ─── Tenant User Manage Access Dialog ─────────────────────────────────────────
+
+type TenantUserRole = 'admin' | 'developer' | 'user' | 'viewer';
+const TENANT_USER_ROLES: TenantUserRole[] = ['admin', 'developer', 'user', 'viewer'];
+
+interface TenantUserManageAccessDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  user: TenantUser;
+  onSave: (updated: TenantUser) => void;
+  isAdmin?: boolean;
+  tenants?: Tenant[];
+}
+
+const TenantUserManageAccessDialog: React.FC<TenantUserManageAccessDialogProps> = ({
+  open, onOpenChange, user, onSave, isAdmin, tenants = INITIAL_TENANTS,
+}) => {
+  const [orgName, setOrgName]         = useState(user.orgName ?? '');
+  const [role, setRole]               = useState<TenantUserRole>(user.role);
+  const [tenantIds, setTenantIds]     = useState<string[]>(user.tenantIds ?? []);
+  const [tenantRoles, setTenantRoles] = useState<Record<string, TenantUserRole>>(
+    () => Object.fromEntries((user.tenantIds ?? []).map(tid => [tid, 'developer' as TenantUserRole]))
+  );
+
+  React.useEffect(() => {
+    if (open) {
+      setOrgName(user.orgName ?? '');
+      setRole(user.role);
+      setTenantIds(user.tenantIds ?? []);
+      setTenantRoles(Object.fromEntries((user.tenantIds ?? []).map(tid => [tid, 'developer' as TenantUserRole])));
+    }
+  }, [open, user]);
+
+  const toggleTenant = (tid: string) => {
+    if (tenantIds.includes(tid)) {
+      setTenantIds(prev => prev.filter(t => t !== tid));
+      setTenantRoles(prev => { const n = { ...prev }; delete n[tid]; return n; });
+    } else {
+      setTenantIds(prev => [...prev, tid]);
+      setTenantRoles(prev => ({ ...prev, [tid]: 'developer' as TenantUserRole }));
+    }
+  };
+
+  const handleSave = () => {
+    onSave({ ...user, orgName: orgName || undefined, role, tenantIds });
+    onOpenChange(false);
+  };
+
+  const avatarColors = [
+    { bg: 'bg-[#E8E8FD]', text: 'text-[#5B5CE6]' },
+    { bg: 'bg-[#DDF3E4]', text: 'text-[#18794E]' },
+    { bg: 'bg-[#FEF2D6]', text: 'text-[#AD5700]' },
+    { bg: 'bg-[#FFE8D7]', text: 'text-[#BD4B00]' },
+    { bg: 'bg-[#FFE5E5]', text: 'text-[#CD2B31]' },
+  ];
+  function hn(s: string) { let h = 0; for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0; return Math.abs(h); }
+  const palette = avatarColors[hn(user.name) % avatarColors.length];
+
+  return (
+    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 bg-black/40 z-50 animate-in fade-in duration-150" />
+        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl z-50 w-[440px] animate-in fade-in slide-in-from-bottom-2 duration-200 focus:outline-none">
+          <div className="px-6 pt-5 pb-4 border-b border-gray-4">
+            <div className="flex items-start justify-between">
+              <Dialog.Title className="text-[16px] font-semibold text-gray-12">Manage Access</Dialog.Title>
+              <Dialog.Close asChild>
+                <button className="w-7 h-7 rounded-md flex items-center justify-center text-gray-8 hover:bg-gray-3 hover:text-gray-11 transition-colors -mr-1 -mt-1">
+                  <X size={16} />
+                </button>
+              </Dialog.Close>
+            </div>
+            <Dialog.Description className="sr-only">Manage access for {user.name}</Dialog.Description>
+          </div>
+
+          <div className="px-6 py-5 space-y-6">
+            <div>
+              <p className="text-[11px] font-semibold text-gray-9 uppercase tracking-wider mb-2.5">Identity</p>
+              <div className="flex items-center gap-3">
+                <div className={cn('w-10 h-10 flex items-center justify-center text-[14px] font-medium shrink-0',
+                  user.type === 'service-account' ? 'rounded-lg bg-gray-3 text-gray-10' : `rounded-full ${palette.bg} ${palette.text}`
+                )}>
+                  {user.initials}
+                </div>
+                <div>
+                  <p className="text-[14px] font-semibold text-gray-12 leading-tight">{user.name}</p>
+                  <p className="text-[12px] text-gray-9 mt-0.5">{user.email}</p>
+                </div>
+              </div>
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold text-gray-9 uppercase tracking-wider mb-3">Org & Tenant Role</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-[11px] text-gray-9 mb-1.5">Organization</p>
+                  <DropdownMenu.Root>
+                    <DropdownMenu.Trigger asChild>
+                      <button className="w-full flex items-center justify-between h-8 px-3 rounded-lg border border-gray-6 bg-white text-[13px] font-medium text-gray-11 hover:bg-gray-2 transition-colors">
+                        {orgName || '—'} <ChevronDown size={12} className="text-gray-8 shrink-0" />
+                      </button>
+                    </DropdownMenu.Trigger>
+                    <DropdownMenu.Portal>
+                      <DropdownMenu.Content align="start" sideOffset={4} className="bg-white rounded-lg shadow-xl border border-gray-5 py-1 w-[160px] z-[60] animate-in fade-in slide-in-from-top-1 duration-150">
+                        {INITIAL_ORGS.map(o => (
+                          <DropdownMenu.Item key={o.id} onClick={() => setOrgName(o.name)}
+                            className={cn('flex items-center justify-between px-3 py-1.5 text-[13px] cursor-pointer outline-none transition-colors',
+                              o.name === orgName ? 'text-[#5B5CE6] bg-[#0011FF08]' : 'text-gray-11 hover:bg-[#0011FF0F] hover:text-[#2E1E71]'
+                            )}
+                          >
+                            {o.name} {o.name === orgName && <Check size={12} className="text-[#5B5CE6]" />}
+                          </DropdownMenu.Item>
+                        ))}
+                      </DropdownMenu.Content>
+                    </DropdownMenu.Portal>
+                  </DropdownMenu.Root>
+                </div>
+                <div>
+                  <p className="text-[11px] text-gray-9 mb-1.5">Tenant Role</p>
+                  <DropdownMenu.Root>
+                    <DropdownMenu.Trigger asChild>
+                      <button className="w-full flex items-center justify-between h-8 px-3 rounded-lg border border-gray-6 bg-white text-[13px] font-medium text-gray-11 hover:bg-gray-2 transition-colors capitalize">
+                        {role} <ChevronDown size={12} className="text-gray-8 shrink-0" />
+                      </button>
+                    </DropdownMenu.Trigger>
+                    <DropdownMenu.Portal>
+                      <DropdownMenu.Content align="start" sideOffset={4} className="bg-white rounded-lg shadow-xl border border-gray-5 py-1 w-[130px] z-[60] animate-in fade-in slide-in-from-top-1 duration-150">
+                        {TENANT_USER_ROLES.map(r => (
+                          <DropdownMenu.Item key={r} onClick={() => setRole(r)}
+                            className={cn('flex items-center justify-between px-3 py-1.5 text-[13px] cursor-pointer outline-none transition-colors capitalize',
+                              r === role ? 'text-[#5B5CE6] bg-[#0011FF08]' : 'text-gray-11 hover:bg-[#0011FF0F] hover:text-[#2E1E71]'
+                            )}
+                          >
+                            {r} {r === role && <Check size={12} className="text-[#5B5CE6]" />}
+                          </DropdownMenu.Item>
+                        ))}
+                      </DropdownMenu.Content>
+                    </DropdownMenu.Portal>
+                  </DropdownMenu.Root>
+                </div>
+              </div>
+            </div>
+
+            {isAdmin && (
+              <div>
+                <p className="text-[11px] font-semibold text-gray-9 uppercase tracking-wider mb-3">Tenant Access</p>
+                <div className="space-y-2">
+                  {tenants.map(t => {
+                    const inTenant = tenantIds.includes(t.id);
+                    return (
+                      <div key={t.id} className="flex items-center gap-3">
+                        <button onClick={() => toggleTenant(t.id)} className="flex items-center gap-2.5 flex-1 min-w-0">
+                          <div className={cn('w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors',
+                            inTenant ? 'bg-[#5B5CE6] border-[#5B5CE6]' : 'border-gray-6'
+                          )}>
+                            {inTenant && <Check size={10} className="text-white" strokeWidth={3} />}
+                          </div>
+                          <span className={cn('text-[13px]', inTenant ? 'text-gray-12 font-medium' : 'text-gray-9')}>{t.name}</span>
+                        </button>
+                        {inTenant && (
+                          <DropdownMenu.Root>
+                            <DropdownMenu.Trigger asChild>
+                              <button className="flex items-center gap-1 h-7 px-2.5 rounded-md border border-gray-6 text-[12px] font-medium text-gray-10 hover:bg-gray-2 transition-colors shrink-0 capitalize">
+                                {tenantRoles[t.id] ?? 'developer'} <ChevronDown size={11} className="text-gray-8" />
+                              </button>
+                            </DropdownMenu.Trigger>
+                            <DropdownMenu.Portal>
+                              <DropdownMenu.Content align="end" sideOffset={4} className="bg-white rounded-lg shadow-xl border border-gray-5 py-1 w-[130px] z-[60] animate-in fade-in slide-in-from-top-1 duration-150">
+                                {TENANT_USER_ROLES.map(r => (
+                                  <DropdownMenu.Item key={r} onClick={() => setTenantRoles(prev => ({ ...prev, [t.id]: r }))}
+                                    className={cn('flex items-center justify-between px-3 py-1.5 text-[13px] cursor-pointer outline-none transition-colors capitalize',
+                                      (tenantRoles[t.id] ?? 'developer') === r ? 'text-[#5B5CE6] bg-[#0011FF08]' : 'text-gray-11 hover:bg-[#0011FF0F] hover:text-[#2E1E71]'
+                                    )}
+                                  >
+                                    {r} {(tenantRoles[t.id] ?? 'developer') === r && <Check size={12} className="text-[#5B5CE6]" />}
+                                  </DropdownMenu.Item>
+                                ))}
+                              </DropdownMenu.Content>
+                            </DropdownMenu.Portal>
+                          </DropdownMenu.Root>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="px-6 py-4 border-t border-gray-4 flex items-center justify-end gap-2">
+            <Dialog.Close asChild>
+              <button className="h-8 px-3 rounded-lg text-[13px] font-medium text-gray-11 hover:bg-gray-3 transition-colors">Cancel</button>
+            </Dialog.Close>
+            <button onClick={handleSave} className="h-8 px-4 rounded-lg text-[13px] font-medium text-white bg-[#5B5CE6] hover:bg-[#4A4BD5] transition-colors">
+              Save Changes
+            </button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+};
+
+// ─── Filter types ─────────────────────────────────────────────────────────────
+
+interface TenantFilters {
+  types:    ('user' | 'service-account')[];
+  statuses: TenantUser['status'][];
+  roles:    TenantUserRole[];
+}
+const DEFAULT_TENANT_FILTERS: TenantFilters = { types: [], statuses: [], roles: [] };
+
+function toggleTenantFilter<K extends keyof TenantFilters>(
+  prev: TenantFilters, key: K, value: TenantFilters[K][number]
+): TenantFilters {
+  const arr = prev[key] as unknown[];
+  return { ...prev, [key]: arr.includes(value) ? arr.filter(v => v !== value) : [...arr, value] };
+}
+
 // ─── Users Management ─────────────────────────────────────────────────────────
 
 interface UsersManagementProps {
   onNavigateToGroup?: (groupName: string) => void;
   onNavigateToOrg?: (orgName: string) => void;
   isAdmin?: boolean;
+  tenants?: Tenant[];
 }
 
-export const UsersManagement: React.FC<UsersManagementProps> = ({ onNavigateToGroup, onNavigateToOrg }) => {
-  const [users, setUsers] = useState<TenantUser[]>(TENANT_USERS);
-  const [search, setSearch] = useState('');
-  const [sortField, setSortField] = useState<SortField>('name');
-  const [sortDir, setSortDir] = useState<SortDir>('asc');
-  const [typeFilter, setTypeFilter] = useState<'all' | 'user' | 'service-account'>('all');
+export const UsersManagement: React.FC<UsersManagementProps> = ({ onNavigateToGroup, onNavigateToOrg, isAdmin, tenants }) => {
+  const [users, setUsers]             = useState<TenantUser[]>(TENANT_USERS);
+  const [search, setSearch]           = useState('');
+  const [sortField, setSortField]     = useState<SortField>('name');
+  const [sortDir, setSortDir]         = useState<SortDir>('asc');
+  const [filters, setFilters]         = useState<TenantFilters>(DEFAULT_TENANT_FILTERS);
+  const [filterOpen, setFilterOpen]   = useState(false);
   const [addUserOpen, setAddUserOpen] = useState(false);
+  const [manageUser, setManageUser]   = useState<TenantUser | null>(null);
+  const [manageDialogOpen, setManageDialogOpen] = useState(false);
+
+  const activeFilterCount = [filters.types, filters.statuses, filters.roles].filter(a => a.length > 0).length;
 
   const handleRemoveUser = (userId: string) =>
     setUsers(prev => prev.filter(u => u.id !== userId));
@@ -346,7 +570,9 @@ export const UsersManagement: React.FC<UsersManagementProps> = ({ onNavigateToGr
 
   const filtered = users
     .filter(u => {
-      if (typeFilter !== 'all' && u.type !== typeFilter) return false;
+      if (filters.types.length    > 0 && !filters.types.includes(u.type as 'user' | 'service-account'))  return false;
+      if (filters.statuses.length > 0 && !filters.statuses.includes(u.status))                           return false;
+      if (filters.roles.length    > 0 && !filters.roles.includes(u.role as TenantUserRole))              return false;
       if (!search) return true;
       const q = search.toLowerCase();
       return u.name.toLowerCase().includes(q)
@@ -367,6 +593,15 @@ export const UsersManagement: React.FC<UsersManagementProps> = ({ onNavigateToGr
       }
     });
 
+  const TenantFilterCheckbox: React.FC<{ checked: boolean; label: string; onToggle: () => void }> = ({ checked, label, onToggle }) => (
+    <button onClick={onToggle} className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded hover:bg-gray-2 transition-colors text-left">
+      <div className={cn('w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors', checked ? 'bg-[#5B5CE6] border-[#5B5CE6]' : 'border-gray-6')}>
+        {checked && <Check size={10} className="text-white" strokeWidth={3} />}
+      </div>
+      <span className="text-[13px] text-gray-11">{label}</span>
+    </button>
+  );
+
   const SortHeader: React.FC<{ field: SortField; label: string; className?: string }> = ({ field, label, className }) => (
     <th className={cn('text-left text-[11px] font-medium text-gray-9 uppercase tracking-wider pb-2.5 pr-3', className)}>
       <button
@@ -383,7 +618,7 @@ export const UsersManagement: React.FC<UsersManagementProps> = ({ onNavigateToGr
     <Tooltip.Provider delayDuration={300}>
       <div className="flex flex-col h-full">
         {/* Toolbar */}
-        <div className="px-6 py-3 border-b border-gray-4 shrink-0 flex items-center gap-3">
+        <div className="px-6 py-3 border-b border-gray-4 shrink-0 flex items-center gap-2">
           <div className="flex items-center gap-2 px-3 h-8 rounded-lg border border-gray-6 bg-white flex-1 max-w-[320px]">
             <Search size={13} className="text-gray-8 shrink-0" />
             <input
@@ -394,32 +629,65 @@ export const UsersManagement: React.FC<UsersManagementProps> = ({ onNavigateToGr
               className="flex-1 bg-transparent text-[13px] text-gray-12 placeholder:text-gray-8 outline-none"
             />
           </div>
-          <div className="flex items-center gap-1 bg-gray-3 p-0.5 rounded-lg">
-            {([
-              { value: 'all' as const, label: 'All', count: users.length },
-              { value: 'user' as const, label: 'Users', count: users.filter(u => u.type === 'user').length },
-              { value: 'service-account' as const, label: 'Service Accounts', count: users.filter(u => u.type === 'service-account').length },
-            ]).map(opt => (
-              <button
-                key={opt.value}
-                onClick={() => setTypeFilter(opt.value)}
-                className={cn(
-                  'px-2.5 py-1 rounded-md text-[12px] font-medium transition-all flex items-center gap-1.5',
-                  typeFilter === opt.value
-                    ? 'bg-white text-gray-12 shadow-sm'
-                    : 'text-gray-9 hover:text-gray-11',
+
+          <Popover.Root open={filterOpen} onOpenChange={setFilterOpen}>
+            <Popover.Trigger asChild>
+              <button className={cn(
+                'h-8 px-3 rounded-lg text-[13px] font-medium flex items-center gap-1.5 transition-colors shrink-0',
+                activeFilterCount > 0 ? 'text-[#5B5CE6] hover:bg-[#EEEEFF]' : 'text-gray-10 hover:bg-gray-3',
+              )}>
+                <SlidersHorizontal size={13} />
+                Filters
+                {activeFilterCount > 0 && (
+                  <span className="min-w-[18px] h-[18px] rounded-full bg-[#5B5CE6] text-white text-[10px] font-semibold flex items-center justify-center px-1">
+                    {activeFilterCount}
+                  </span>
                 )}
-              >
-                {opt.label}
-                <span className={cn(
-                  'text-[10px] px-1.5 py-0.5 rounded-full font-medium',
-                  typeFilter === opt.value ? 'bg-gray-3 text-gray-11' : 'bg-gray-4 text-gray-8',
-                )}>
-                  {opt.count}
-                </span>
               </button>
-            ))}
-          </div>
+            </Popover.Trigger>
+            <Popover.Portal>
+              <Popover.Content align="start" sideOffset={6} className="bg-white rounded-xl shadow-xl border border-gray-5 w-[210px] z-50 animate-in fade-in slide-in-from-top-1 duration-150 pb-2">
+                <div className="flex items-center justify-between px-3 pt-3 pb-2 border-b border-gray-4">
+                  <span className="text-[13px] font-semibold text-gray-12">Filters</span>
+                  <div className="flex items-center gap-1">
+                    {activeFilterCount > 0 && (
+                      <button onClick={() => setFilters(DEFAULT_TENANT_FILTERS)} className="text-[11px] text-[#5B5CE6] hover:underline">Clear all</button>
+                    )}
+                    <Popover.Close asChild>
+                      <button className="w-6 h-6 rounded flex items-center justify-center text-gray-8 hover:bg-gray-3 hover:text-gray-11 transition-colors ml-1">
+                        <X size={13} />
+                      </button>
+                    </Popover.Close>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-9 uppercase tracking-wider px-3 pt-3 pb-1">Identity Type</p>
+                  <div className="px-1.5 space-y-0.5">
+                    <TenantFilterCheckbox checked={filters.types.includes('user')}            label="Users"            onToggle={() => setFilters(p => toggleTenantFilter(p, 'types', 'user'))} />
+                    <TenantFilterCheckbox checked={filters.types.includes('service-account')} label="Service Accounts" onToggle={() => setFilters(p => toggleTenantFilter(p, 'types', 'service-account'))} />
+                  </div>
+                  <p className="text-[10px] font-semibold text-gray-9 uppercase tracking-wider px-3 pt-3 pb-1">Status</p>
+                  <div className="px-1.5 space-y-0.5">
+                    <TenantFilterCheckbox checked={filters.statuses.includes('active')}   label="Active"   onToggle={() => setFilters(p => toggleTenantFilter(p, 'statuses', 'active'))} />
+                    <TenantFilterCheckbox checked={filters.statuses.includes('inactive')} label="Inactive" onToggle={() => setFilters(p => toggleTenantFilter(p, 'statuses', 'inactive'))} />
+                    <TenantFilterCheckbox checked={filters.statuses.includes('pending')}  label="Pending"  onToggle={() => setFilters(p => toggleTenantFilter(p, 'statuses', 'pending'))} />
+                  </div>
+                  <p className="text-[10px] font-semibold text-gray-9 uppercase tracking-wider px-3 pt-3 pb-1">Role</p>
+                  <div className="px-1.5 space-y-0.5 pb-1">
+                    <TenantFilterCheckbox checked={filters.roles.includes('admin')}     label="Admin"     onToggle={() => setFilters(p => toggleTenantFilter(p, 'roles', 'admin'))} />
+                    <TenantFilterCheckbox checked={filters.roles.includes('developer')} label="Developer" onToggle={() => setFilters(p => toggleTenantFilter(p, 'roles', 'developer'))} />
+                    <TenantFilterCheckbox checked={filters.roles.includes('user')}      label="User"      onToggle={() => setFilters(p => toggleTenantFilter(p, 'roles', 'user'))} />
+                    <TenantFilterCheckbox checked={filters.roles.includes('viewer')}    label="Viewer"    onToggle={() => setFilters(p => toggleTenantFilter(p, 'roles', 'viewer'))} />
+                  </div>
+                </div>
+              </Popover.Content>
+            </Popover.Portal>
+          </Popover.Root>
+
+          {activeFilterCount > 0 && (
+            <button onClick={() => setFilters(DEFAULT_TENANT_FILTERS)} className="text-[12px] text-gray-9 hover:text-gray-12 transition-colors underline shrink-0">Clear</button>
+          )}
+
           <div className="ml-auto">
             <button
               onClick={() => setAddUserOpen(true)}
@@ -430,6 +698,38 @@ export const UsersManagement: React.FC<UsersManagementProps> = ({ onNavigateToGr
             </button>
           </div>
         </div>
+
+        {manageUser && (
+          <TenantUserManageAccessDialog
+            isAdmin={isAdmin}
+            tenants={tenants}
+            open={manageDialogOpen}
+            onOpenChange={o => {
+              setManageDialogOpen(o);
+              if (!o) {
+                setTimeout(() => setManageUser(null), 300);
+                // Workaround: Radix Dialog + nested DropdownMenu can leave
+                // body.style.pointerEvents stuck at 'none' after close.
+                setTimeout(() => {
+                  if (document.body.style.pointerEvents === 'none') {
+                    document.body.style.pointerEvents = '';
+                  }
+                }, 400);
+              }
+            }}
+            user={manageUser}
+            onSave={updated => {
+              setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
+              setManageDialogOpen(false);
+              setTimeout(() => setManageUser(null), 300);
+              setTimeout(() => {
+                if (document.body.style.pointerEvents === 'none') {
+                  document.body.style.pointerEvents = '';
+                }
+              }, 400);
+            }}
+          />
+        )}
 
         {/* Table */}
         <ScrollArea.Root className="flex-1">
@@ -446,7 +746,7 @@ export const UsersManagement: React.FC<UsersManagementProps> = ({ onNavigateToGr
                     <tr className="border-b border-gray-4">
                       <SortHeader field="name" label="Member" className="w-[220px]" />
                       <SortHeader field="status" label="Status" className="w-[110px]" />
-                      <SortHeader field="orgName" label="Org" className="w-[110px]" />
+                      {isAdmin && <SortHeader field="orgName" label="Org" className="w-[110px]" />}
                       <SortHeader field="role" label="Role" className="w-[120px]" />
                       <SortHeader field="groups" label="Groups" />
                       <SortHeader field="createdAt" label="Date Added" className="w-[120px]" />
@@ -487,14 +787,16 @@ export const UsersManagement: React.FC<UsersManagementProps> = ({ onNavigateToGr
                         <td className="py-2.5 pr-3">
                           <StatusBadge status={user.status} />
                         </td>
-                        <td className="py-2.5 pr-3">
-                          {user.orgName
-                            ? onNavigateToOrg
-                              ? <button onClick={() => onNavigateToOrg(user.orgName!)} className="text-[12px] text-[#5B5CE6] hover:underline transition-colors text-left">{user.orgName}</button>
-                              : <span className="text-[12px] text-gray-11">{user.orgName}</span>
-                            : <span className="text-[12px] text-gray-7 italic">—</span>
-                          }
-                        </td>
+                        {isAdmin && (
+                          <td className="py-2.5 pr-3">
+                            {user.orgName
+                              ? onNavigateToOrg
+                                ? <button onClick={() => onNavigateToOrg(user.orgName!)} className="text-[12px] text-[#5B5CE6] hover:underline transition-colors text-left">{user.orgName}</button>
+                                : <span className="text-[12px] text-gray-11">{user.orgName}</span>
+                              : <span className="text-[12px] text-gray-7 italic">—</span>
+                            }
+                          </td>
+                        )}
                         <td className="py-2.5 pr-3">
                           <DropdownMenu.Root>
                             <DropdownMenu.Trigger asChild>
@@ -523,7 +825,7 @@ export const UsersManagement: React.FC<UsersManagementProps> = ({ onNavigateToGr
                         <td className="py-2.5 pr-3">
                           <GroupsCell groups={user.groups} onNavigateToGroup={onNavigateToGroup} />
                         </td>
-                        <td className="py-2.5">
+                        <td className="py-2.5 text-left">
                           <span className="text-[12px] text-gray-9">{user.createdAt}</span>
                         </td>
                         <td className="py-2.5">
@@ -535,6 +837,16 @@ export const UsersManagement: React.FC<UsersManagementProps> = ({ onNavigateToGr
                             </DropdownMenu.Trigger>
                             <DropdownMenu.Portal>
                               <DropdownMenu.Content align="end" sideOffset={4} className="bg-white rounded-lg shadow-xl border border-gray-5 py-1 w-[180px] z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                                <DropdownMenu.Item
+                                  onSelect={(e) => {
+                                    e.preventDefault();
+                                    setManageUser(user);
+                                    setTimeout(() => setManageDialogOpen(true), 0);
+                                  }}
+                                  className="flex items-center gap-2 px-3 py-1.5 text-[13px] text-gray-11 hover:bg-[#0011FF0F] hover:text-[#2E1E71] cursor-pointer outline-none transition-colors"
+                                >
+                                  Manage access
+                                </DropdownMenu.Item>
                                 <DropdownMenu.Item
                                   onClick={() => handleRemoveUser(user.id)}
                                   className="flex items-center gap-2 px-3 py-1.5 text-[13px] text-red-10 hover:bg-red-2 cursor-pointer outline-none transition-colors"
