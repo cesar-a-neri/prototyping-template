@@ -1032,6 +1032,8 @@ const CopyIdMenuItem: React.FC<{ id: string; entityType: 'org' | 'tenant' }> = (
 interface ControlPlaneLeftSidebarProps {
   activeView: ManagementView;
   activeOrgId: string | null;
+  activeTenantId: string;
+  onSetActiveTenantId: (id: string) => void;
   onSetActiveView: (v: ManagementView) => void;
   onNavigateOrg: (orgId: string) => void;
   showUsers: boolean;
@@ -1041,9 +1043,8 @@ interface ControlPlaneLeftSidebarProps {
   headerStyle?: 'logo' | 'back-button';
 }
 
-const ControlPlaneLeftSidebar: React.FC<ControlPlaneLeftSidebarProps> = ({ activeView, activeOrgId, onSetActiveView, onNavigateOrg, showUsers, tenants, onUpdateTenants, isAdmin, headerStyle = 'logo' }) => {
+const ControlPlaneLeftSidebar: React.FC<ControlPlaneLeftSidebarProps> = ({ activeView, activeOrgId, activeTenantId, onSetActiveTenantId: setActiveTenantId, onSetActiveView, onNavigateOrg, showUsers, tenants, onUpdateTenants, isAdmin, headerStyle = 'logo' }) => {
   const [orgs, setOrgs] = useState<Org[]>(INITIAL_ORGS);
-  const [activeTenantId, setActiveTenantId] = useState('t1');
   const [openAccordions, setOpenAccordions] = useState<Set<string>>(new Set(['t1', 'o1']));
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
@@ -1411,12 +1412,13 @@ interface ManagementPanelProps {
   hideHeader?: boolean;
   activeOrgId: string | null;
   onSetActiveOrgId: (orgId: string | null) => void;
+  activeTenantId?: string;
   tenants: Tenant[];
   onNavigateToTenantUsers: (tenantId: string) => void;
   isAdmin?: boolean;
 }
 
-const ManagementPanel: React.FC<ManagementPanelProps> = ({ groups, onUpdateGroups, showUsers, groupsLayout, activeView, onSetActiveView, hideHeader, activeOrgId, onSetActiveOrgId, tenants, onNavigateToTenantUsers, isAdmin }) => {
+const ManagementPanel: React.FC<ManagementPanelProps> = ({ groups, onUpdateGroups, showUsers, groupsLayout, activeView, onSetActiveView, hideHeader, activeOrgId, onSetActiveOrgId, activeTenantId, tenants, onNavigateToTenantUsers, isAdmin }) => {
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(
     groupsLayout === 'sidebar' ? (groups[0]?.id ?? null) : null
   );
@@ -1531,12 +1533,25 @@ const ManagementPanel: React.FC<ManagementPanelProps> = ({ groups, onUpdateGroup
       {/* Left-panel title header */}
       {hideHeader && (
         <div className="bg-white px-6 py-4 shrink-0">
+          {activeView === 'org-members' && activeOrgId && (() => {
+            const org = INITIAL_ORGS.find(o => o.id === activeOrgId);
+            return org ? (
+              <p className="text-[12px] font-medium text-gray-9 mb-1">{org.name}</p>
+            ) : null;
+          })()}
+          {activeView !== 'org-members' && activeView !== 'identities' && activeTenantId && (() => {
+            const tenant = tenants.find(t => t.id === activeTenantId);
+            return tenant ? (
+              <p className="text-[12px] font-medium text-gray-9 mb-1">{tenant.name}</p>
+            ) : null;
+          })()}
           <h1 className="text-[20px] font-semibold text-gray-12">
             {activeView === 'groups' ? 'Groups'
               : activeView === 'users' ? 'Members'
               : activeView === 'roles' ? 'Roles'
-              : activeView === 'identities' ? 'Identities'
-              : 'Identities'}
+              : activeView === 'identities' ? 'All Identities'
+              : activeView === 'org-members' ? 'Members'
+              : 'All Identities'}
           </h1>
         </div>
       )}
@@ -1663,6 +1678,7 @@ const GroupRoleManagement: React.FC = () => {
   const [tenants, setTenants] = useState<Tenant[]>(INITIAL_TENANTS);
   const [activeView, setActiveView] = useState<ManagementView>('identities');
   const [activeOrgId, setActiveOrgId] = useState<string | null>(null);
+  const [activeTenantId, setActiveTenantId] = useState('t1');
   const navRef = useRef<HTMLDivElement>(null);
 
   const closeMenus = useCallback(() => setOpenMenu(null), []);
@@ -1694,6 +1710,8 @@ const GroupRoleManagement: React.FC = () => {
             <ControlPlaneLeftSidebar
               activeView={activeView}
               activeOrgId={activeOrgId}
+              activeTenantId={activeTenantId}
+              onSetActiveTenantId={setActiveTenantId}
               onSetActiveView={setActiveView}
               onNavigateOrg={(orgId) => { setActiveOrgId(orgId); setActiveView('org-members'); }}
               showUsers={showUsers}
@@ -1713,6 +1731,7 @@ const GroupRoleManagement: React.FC = () => {
                 hideHeader
                 activeOrgId={activeOrgId}
                 onSetActiveOrgId={setActiveOrgId}
+                activeTenantId={activeTenantId}
                 tenants={tenants}
                 onNavigateToTenantUsers={handleNavigateToTenantUsers}
                 isAdmin={isAdmin}
