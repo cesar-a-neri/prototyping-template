@@ -302,6 +302,101 @@ function hashStr(s: string) {
   let h = 0; for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0; return Math.abs(h);
 }
 
+// ─── Shared types / helpers used by both dialogs ─────────────────────────────
+
+type OrgTenantRole = 'admin' | 'developer' | 'user' | 'viewer';
+const ORG_TENANT_ROLES: OrgTenantRole[] = ['admin', 'developer', 'user', 'viewer'];
+const ORG_ROLES_ORDERED: OrgRole[] = ['platform-admin', 'admin', 'member'];
+
+function orgTenantRoleLabel(r: OrgTenantRole) {
+  return r.charAt(0).toUpperCase() + r.slice(1);
+}
+
+// ─── Tenant Access List (shared: search + select-all) ─────────────────────────
+
+const TenantAccessList: React.FC<{
+  tenants: Tenant[];
+  tenantIds: string[];
+  tenantRoles: Record<string, OrgTenantRole>;
+  onToggleTenant: (tid: string) => void;
+  onSetRole: (tid: string, role: OrgTenantRole) => void;
+  onSelectAll: () => void;
+  onDeselectAll: () => void;
+}> = ({ tenants, tenantIds, tenantRoles, onToggleTenant, onSetRole, onSelectAll, onDeselectAll }) => {
+  const [query, setQuery] = useState('');
+  const filtered = tenants.filter(t => t.name.toLowerCase().includes(query.toLowerCase()));
+  const allSelected = tenants.length > 0 && tenants.every(t => tenantIds.includes(t.id));
+
+  return (
+    <div className="space-y-2">
+      {/* Search + select-all row */}
+      <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 px-2.5 h-7 rounded-lg border border-gray-6 bg-white flex-1 focus-within:ring-2 focus-within:ring-[#5B5CE6] focus-within:border-transparent transition-shadow">
+          <Search size={12} className="text-gray-8 shrink-0" />
+          <input
+            type="text"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Search tenants…"
+            className="flex-1 bg-transparent text-[12px] text-gray-12 placeholder:text-gray-8 outline-none"
+          />
+        </div>
+        <button
+          onClick={allSelected ? onDeselectAll : onSelectAll}
+          className="text-[12px] font-medium text-[#5B5CE6] hover:text-[#4A4BD5] whitespace-nowrap shrink-0 transition-colors"
+        >
+          {allSelected ? 'Deselect all' : 'Select all'}
+        </button>
+      </div>
+
+      {/* List */}
+      <div className="space-y-1">
+        {filtered.length === 0 && (
+          <p className="text-[12px] text-gray-8 py-1">No tenants match "{query}"</p>
+        )}
+        {filtered.map(t => {
+          const inTenant = tenantIds.includes(t.id);
+          return (
+            <div key={t.id} className="flex items-center gap-3">
+              <button onClick={() => onToggleTenant(t.id)} className="flex items-center gap-2.5 flex-1 min-w-0">
+                <div className={cn('w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors',
+                  inTenant ? 'bg-[#5B5CE6] border-[#5B5CE6]' : 'border-gray-6'
+                )}>
+                  {inTenant && <Check size={10} className="text-white" strokeWidth={3} />}
+                </div>
+                <span className={cn('text-[13px]', inTenant ? 'text-gray-12 font-medium' : 'text-gray-9')}>{t.name}</span>
+              </button>
+              {inTenant && (
+                <DropdownMenu.Root>
+                  <DropdownMenu.Trigger asChild>
+                    <button className="flex items-center gap-1 h-7 px-2.5 rounded-md border border-gray-6 text-[12px] font-medium text-gray-10 hover:bg-gray-2 transition-colors shrink-0">
+                      {orgTenantRoleLabel(tenantRoles[t.id] ?? 'developer')} <ChevronDown size={11} className="text-gray-8" />
+                    </button>
+                  </DropdownMenu.Trigger>
+                  <DropdownMenu.Portal>
+                    <DropdownMenu.Content align="end" sideOffset={4} className="bg-white rounded-lg shadow-xl border border-gray-5 py-1 w-[130px] z-[60] animate-in fade-in slide-in-from-top-1 duration-150">
+                      {ORG_TENANT_ROLES.map(r => (
+                        <DropdownMenu.Item key={r}
+                          onClick={() => onSetRole(t.id, r)}
+                          className={cn('flex items-center justify-between px-3 py-1.5 text-[13px] cursor-pointer outline-none transition-colors',
+                            (tenantRoles[t.id] ?? 'developer') === r ? 'text-[#5B5CE6] bg-[#0011FF08]' : 'text-gray-11 hover:bg-[#0011FF0F] hover:text-[#2E1E71]'
+                          )}
+                        >
+                          {orgTenantRoleLabel(r)} {(tenantRoles[t.id] ?? 'developer') === r && <Check size={12} className="text-[#5B5CE6]" />}
+                        </DropdownMenu.Item>
+                      ))}
+                    </DropdownMenu.Content>
+                  </DropdownMenu.Portal>
+                </DropdownMenu.Root>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 // ─── Invite Org Members Dialog ────────────────────────────────────────────────
 
 const InviteOrgMembersDialog: React.FC<{
@@ -330,6 +425,20 @@ const InviteOrgMembersDialog: React.FC<{
       setTenantIds(prev => [...prev, tid]);
       setTenantRoles(prev => ({ ...prev, [tid]: 'developer' as OrgTenantRole }));
     }
+  };
+
+  const selectAllTenants = () => {
+    setTenantIds(tenants.map(t => t.id));
+    setTenantRoles(prev => {
+      const n = { ...prev };
+      tenants.forEach(t => { if (!n[t.id]) n[t.id] = 'developer'; });
+      return n;
+    });
+  };
+
+  const deselectAllTenants = () => {
+    setTenantIds([]);
+    setTenantRoles({});
   };
 
   const handleSubmit = () => {
@@ -406,41 +515,15 @@ const InviteOrgMembersDialog: React.FC<{
             {isAdmin && tenants.length > 0 && (
               <div className="space-y-1.5 pt-1">
                 <p className="text-[11px] font-semibold text-gray-9 uppercase tracking-wider pb-0.5">Tenant Access <span className="normal-case font-normal text-gray-7">(optional)</span></p>
-                {tenants.map(t => {
-                  const inTenant = tenantIds.includes(t.id);
-                  return (
-                    <div key={t.id} className="flex items-center gap-3">
-                      <button onClick={() => toggleTenant(t.id)} className="flex items-center gap-2.5 flex-1 min-w-0">
-                        <div className={cn('w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors', inTenant ? 'bg-[#5B5CE6] border-[#5B5CE6]' : 'border-gray-6')}>
-                          {inTenant && <Check size={10} className="text-white" strokeWidth={3} />}
-                        </div>
-                        <span className={cn('text-[13px]', inTenant ? 'text-gray-12 font-medium' : 'text-gray-9')}>{t.name}</span>
-                      </button>
-                      {inTenant && (
-                        <DropdownMenu.Root>
-                          <DropdownMenu.Trigger asChild>
-                            <button className="flex items-center gap-1 h-7 px-2.5 rounded-md border border-gray-6 text-[12px] font-medium text-gray-10 hover:bg-gray-2 transition-colors shrink-0">
-                              {orgTenantRoleLabel(tenantRoles[t.id] ?? 'developer')} <ChevronDown size={11} className="text-gray-8" />
-                            </button>
-                          </DropdownMenu.Trigger>
-                          <DropdownMenu.Portal>
-                            <DropdownMenu.Content align="end" sideOffset={4} className="bg-white rounded-lg shadow-xl border border-gray-5 py-1 w-[130px] z-[60] animate-in fade-in slide-in-from-top-1 duration-150">
-                              {ORG_TENANT_ROLES.map(r => (
-                                <DropdownMenu.Item key={r} onClick={() => setTenantRoles(prev => ({ ...prev, [t.id]: r }))}
-                                  className={cn('flex items-center justify-between px-3 py-1.5 text-[13px] cursor-pointer outline-none transition-colors',
-                                    (tenantRoles[t.id] ?? 'developer') === r ? 'text-[#5B5CE6] bg-[#0011FF08]' : 'text-gray-11 hover:bg-[#0011FF0F] hover:text-[#2E1E71]'
-                                  )}
-                                >
-                                  {orgTenantRoleLabel(r)} {(tenantRoles[t.id] ?? 'developer') === r && <Check size={12} className="text-[#5B5CE6]" />}
-                                </DropdownMenu.Item>
-                              ))}
-                            </DropdownMenu.Content>
-                          </DropdownMenu.Portal>
-                        </DropdownMenu.Root>
-                      )}
-                    </div>
-                  );
-                })}
+                <TenantAccessList
+                  tenants={tenants}
+                  tenantIds={tenantIds}
+                  tenantRoles={tenantRoles}
+                  onToggleTenant={toggleTenant}
+                  onSetRole={(tid, r) => setTenantRoles(prev => ({ ...prev, [tid]: r }))}
+                  onSelectAll={selectAllTenants}
+                  onDeselectAll={deselectAllTenants}
+                />
               </div>
             )}
           </div>
@@ -481,14 +564,6 @@ const OrgMemberStatusBadge: React.FC<{ status: OrgMemberStatus }> = ({ status })
 
 // ─── Org Member Manage Access Dialog ─────────────────────────────────────────
 
-type OrgTenantRole = 'admin' | 'developer' | 'user' | 'viewer';
-const ORG_TENANT_ROLES: OrgTenantRole[] = ['admin', 'developer', 'user', 'viewer'];
-const ORG_ROLES_ORDERED: OrgRole[] = ['platform-admin', 'admin', 'member'];
-
-function orgTenantRoleLabel(r: OrgTenantRole) {
-  return r.charAt(0).toUpperCase() + r.slice(1);
-}
-
 interface OrgMemberManageAccessDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -528,6 +603,20 @@ const OrgMemberManageAccessDialog: React.FC<OrgMemberManageAccessDialogProps> = 
       setTenantIds(p => [...p, tid]);
       setTenantRoles(p => ({ ...p, [tid]: 'developer' }));
     }
+  };
+
+  const selectAllTenants = () => {
+    setTenantIds(tenants.map(t => t.id));
+    setTenantRoles(prev => {
+      const n = { ...prev };
+      tenants.forEach(t => { if (!n[t.id]) n[t.id] = 'developer'; });
+      return n;
+    });
+  };
+
+  const deselectAllTenants = () => {
+    setTenantIds([]);
+    setTenantRoles({});
   };
 
   const handleSave = () => {
@@ -624,46 +713,15 @@ const OrgMemberManageAccessDialog: React.FC<OrgMemberManageAccessDialogProps> = 
 
             {isAdmin && <div>
               <p className="text-[11px] font-semibold text-gray-9 uppercase tracking-wider mb-3">Tenant Access</p>
-              <div className="space-y-2">
-                {tenants.map(t => {
-                  const inTenant = tenantIds.includes(t.id);
-                  return (
-                    <div key={t.id} className="flex items-center gap-3">
-                      <button onClick={() => toggleTenant(t.id)} className="flex items-center gap-2.5 flex-1 min-w-0">
-                        <div className={cn('w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors',
-                          inTenant ? 'bg-[#5B5CE6] border-[#5B5CE6]' : 'border-gray-6'
-                        )}>
-                          {inTenant && <Check size={10} className="text-white" strokeWidth={3} />}
-                        </div>
-                        <span className={cn('text-[13px]', inTenant ? 'text-gray-12 font-medium' : 'text-gray-9')}>{t.name}</span>
-                      </button>
-                      {inTenant && (
-                        <DropdownMenu.Root>
-                          <DropdownMenu.Trigger asChild>
-                            <button className="flex items-center gap-1 h-7 px-2.5 rounded-md border border-gray-6 text-[12px] font-medium text-gray-10 hover:bg-gray-2 transition-colors shrink-0">
-                              {orgTenantRoleLabel(tenantRoles[t.id] ?? 'developer')} <ChevronDown size={11} className="text-gray-8" />
-                            </button>
-                          </DropdownMenu.Trigger>
-                          <DropdownMenu.Portal>
-                            <DropdownMenu.Content align="end" sideOffset={4} className="bg-white rounded-lg shadow-xl border border-gray-5 py-1 w-[130px] z-[60] animate-in fade-in slide-in-from-top-1 duration-150">
-                              {ORG_TENANT_ROLES.map(r => (
-                                <DropdownMenu.Item key={r}
-                                  onClick={() => setTenantRoles(p => ({ ...p, [t.id]: r }))}
-                                  className={cn('flex items-center justify-between px-3 py-1.5 text-[13px] cursor-pointer outline-none transition-colors',
-                                    (tenantRoles[t.id] ?? 'developer') === r ? 'text-[#5B5CE6] bg-[#0011FF08]' : 'text-gray-11 hover:bg-[#0011FF0F] hover:text-[#2E1E71]'
-                                  )}
-                                >
-                                  {orgTenantRoleLabel(r)} {(tenantRoles[t.id] ?? 'developer') === r && <Check size={12} className="text-[#5B5CE6]" />}
-                                </DropdownMenu.Item>
-                              ))}
-                            </DropdownMenu.Content>
-                          </DropdownMenu.Portal>
-                        </DropdownMenu.Root>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+              <TenantAccessList
+                tenants={tenants}
+                tenantIds={tenantIds}
+                tenantRoles={tenantRoles}
+                onToggleTenant={toggleTenant}
+                onSetRole={(tid, r) => setTenantRoles(p => ({ ...p, [tid]: r }))}
+                onSelectAll={selectAllTenants}
+                onDeselectAll={deselectAllTenants}
+              />
             </div>}
           </div>
 
