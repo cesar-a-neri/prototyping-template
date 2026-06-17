@@ -7,6 +7,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Card } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Tabs, TabsListUnderline, TabsTriggerUnderline, TabsContent } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import {
@@ -135,24 +139,34 @@ export const WorkspaceDetail: React.FC<WorkspaceDetailProps> = ({ workspaceId, o
                     Workspace {idx + 1} of {ordered.length}
                 </span>
                 <div className="flex gap-1">
-                    <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => step(-1)}
-                        aria-label="Previous workspace"
-                        className="size-7"
-                    >
-                        <ChevronRight aria-hidden="true" className="size-3.5 rotate-180" strokeWidth={2} />
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => step(1)}
-                        aria-label="Next workspace"
-                        className="size-7"
-                    >
-                        <ChevronRight aria-hidden="true" className="size-3.5" strokeWidth={2} />
-                    </Button>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => step(-1)}
+                                aria-label="Previous workspace"
+                                className="size-7"
+                            >
+                                <ChevronRight aria-hidden="true" className="size-3.5 rotate-180" strokeWidth={2} />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Previous workspace</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => step(1)}
+                                aria-label="Next workspace"
+                                className="size-7"
+                            >
+                                <ChevronRight aria-hidden="true" className="size-3.5" strokeWidth={2} />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Next workspace</TooltipContent>
+                    </Tooltip>
                 </div>
             </nav>
 
@@ -228,7 +242,7 @@ export const WorkspaceDetail: React.FC<WorkspaceDetailProps> = ({ workspaceId, o
                 )}
 
                 {/* metadata grid */}
-                <div className="mx-6 mb-5 border border-border rounded-xl overflow-hidden border-b-0 border-r-0">
+                <Card className="mx-6 mb-5 overflow-hidden border-b-0 border-r-0 shadow-none">
                     <div className="grid grid-cols-4">
                         <ShadKV k="Customer tier" v={cust.tier} mono />
                         <ShadKV k="Cloud" v={fCloudName(w.cloud)} />
@@ -239,7 +253,7 @@ export const WorkspaceDetail: React.FC<WorkspaceDetailProps> = ({ workspaceId, o
                         <ShadKV k="Last heartbeat" v={stale.label} mono color={stale.stale ? sev.fg : undefined} />
                         <ShadKV k="Workspace age" v={`${shadAge(w.id)} d`} mono />
                     </div>
-                </div>
+                </Card>
 
                 {/* tabs */}
                 <Tabs value={tab} onValueChange={(v) => setTab(v as 'packs' | 'flags')}>
@@ -291,51 +305,47 @@ const PacksTab: React.FC<{ ds: Deployment[]; wsId: string; packQuery: string; se
                     />
                 </div>
             </div>
-            <div className="border border-border rounded-xl overflow-hidden shadow-sm">
-                <table className="w-full border-collapse text-sm">
-                    <thead>
-                        <tr className="bg-muted">
+            <Card className="overflow-hidden">
+                <Table>
+                    <TableHeader>
+                        <TableRow className="bg-muted">
                             {PACK_COLS.map(h => (
-                                <th key={h} scope="col" className="text-left px-3.5 py-2 text-[11px] font-medium text-muted-foreground border-b border-border whitespace-nowrap">
-                                    {h}
-                                </th>
+                                <TableHead key={h}>{h}</TableHead>
                             ))}
-                        </tr>
-                    </thead>
-                    <tbody>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
                         {groups.length === 0 && (
-                            <tr>
-                                <td colSpan={PACK_COLS.length} className="p-6 text-center text-muted-foreground text-sm" aria-live="polite">
+                            <TableRow>
+                                <TableCell colSpan={PACK_COLS.length} className="p-6 text-center text-muted-foreground text-sm" aria-live="polite">
                                     No packs match &ldquo;{packQuery}&rdquo;.
-                                </td>
-                            </tr>
+                                </TableCell>
+                            </TableRow>
                         )}
-                        {groups.map((g, gi) => g.wls.map((wl, j) => {
+                        {groups.map((g) => g.wls.map((wl, j) => {
                             const first = j === 0;
-                            const isLast = gi === groups.length - 1 && j === g.wls.length - 1;
                             const tint = SHAD_SEV[(g.health === 'Healthy' ? 'healthy' : g.health === 'Degraded' ? 'degraded' : g.health === 'Failed' ? 'failed' : 'stale')].tint;
-                            const cellBase = 'px-3.5 py-3 align-middle h-[42px] box-border';
+                            const cellBase = 'py-3 h-[42px] box-border';
                             return (
-                                <tr
+                                <TableRow
                                     key={g.pack + j}
-                                    className={cn(!isLast && 'border-b border-border')}
                                     style={{ background: tint }}
                                 >
-                                    <td className={cn(cellBase, 'font-mono font-medium')}>{first ? g.pack : ''}</td>
-                                    <td className={cn(cellBase, 'font-mono text-xs text-muted-foreground')}>{first ? g.chart : ''}</td>
-                                    <td className={cn(cellBase, 'font-mono text-xs')}>{first ? g.rev : ''}</td>
-                                    <td className={cn(cellBase, 'font-mono text-xs')}>{first ? g.ns : ''}</td>
-                                    <td className={cellBase}>{first ? <ShadHealthPill h={g.health} /> : null}</td>
-                                    <td className={cn(cellBase, 'font-mono text-xs')}>{wl.workload}</td>
-                                    <td className={cn(cellBase, 'text-xs')}>{wl.container}</td>
-                                    <td className={cn(cellBase, 'font-mono text-xs text-muted-foreground')}>{wl.repo}</td>
-                                    <td className={cn(cellBase, 'font-mono text-xs')}>{wl.tag}</td>
-                                </tr>
+                                    <TableCell className={cn(cellBase, 'font-mono font-medium')}>{first ? g.pack : ''}</TableCell>
+                                    <TableCell className={cn(cellBase, 'font-mono text-xs text-muted-foreground')}>{first ? g.chart : ''}</TableCell>
+                                    <TableCell className={cn(cellBase, 'font-mono text-xs')}>{first ? g.rev : ''}</TableCell>
+                                    <TableCell className={cn(cellBase, 'font-mono text-xs')}>{first ? g.ns : ''}</TableCell>
+                                    <TableCell className={cellBase}>{first ? <ShadHealthPill h={g.health} /> : null}</TableCell>
+                                    <TableCell className={cn(cellBase, 'font-mono text-xs')}>{wl.workload}</TableCell>
+                                    <TableCell className={cn(cellBase, 'text-xs')}>{wl.container}</TableCell>
+                                    <TableCell className={cn(cellBase, 'font-mono text-xs text-muted-foreground')}>{wl.repo}</TableCell>
+                                    <TableCell className={cn(cellBase, 'font-mono text-xs')}>{wl.tag}</TableCell>
+                                </TableRow>
                             );
                         }))}
-                    </tbody>
-                </table>
-            </div>
+                    </TableBody>
+                </Table>
+            </Card>
         </div>
     );
 };
@@ -347,9 +357,9 @@ const FlagsTab: React.FC = () => (
         {featureFlags.map(f => {
             const on = f.type === 'bool' && f.value === 'true';
             return (
-                <div
+                <Card
                     key={f.key}
-                    className="flex items-center justify-between gap-2.5 px-3.5 py-3 border border-border rounded-xl bg-card shadow-sm"
+                    className="flex items-center justify-between gap-2.5 px-3.5 py-3"
                 >
                     <div className="min-w-0">
                         <div className="font-mono text-[12.5px] whitespace-nowrap overflow-hidden text-ellipsis">{f.key}</div>
@@ -358,17 +368,16 @@ const FlagsTab: React.FC = () => (
                         </p>
                     </div>
                     {f.type === 'bool' ? (
-                        <Badge variant={on ? 'success' : 'outline'} className={cn('font-mono', !on && 'text-muted-foreground')}>
-                            <span
-                                aria-hidden="true"
-                                className={cn('size-1.5 rounded-full', on ? 'bg-success-text' : 'bg-zinc-300')}
-                            />
-                            {f.value}
-                        </Badge>
+                        <Switch
+                            checked={on}
+                            disabled
+                            aria-label={`${f.key} is ${on ? 'enabled' : 'disabled'}`}
+                            aria-readonly="true"
+                        />
                     ) : (
                         <span className="font-mono text-[12.5px] font-semibold">{f.value}</span>
                     )}
-                </div>
+                </Card>
             );
         })}
     </div>

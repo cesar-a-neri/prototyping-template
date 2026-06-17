@@ -9,7 +9,7 @@ import {
     AreaChart,
     CartesianGrid,
     ResponsiveContainer,
-    Tooltip,
+    Tooltip as RechartsTooltip,
     XAxis,
     YAxis,
 } from 'recharts';
@@ -18,6 +18,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { SegmentedControl } from '@/components/ui/segmented-control';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import {
     SHAD_SEV, DEP_STATUS_HEALTH,
@@ -183,24 +187,16 @@ export const FIBrowse: React.FC<FIBrowseProps> = ({
                             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                                 <h1 style={{ fontSize: 24, fontWeight: 600, margin: 0, letterSpacing: '-.01em' }}>{title}</h1>
                                 {showToggle && (
-                                    <div role="tablist" aria-label="View" className="inline-flex bg-muted rounded-lg p-[3px] gap-0.5">
-                                        {(['workspaces', 'deployments'] as Mode[]).map(k => (
-                                            <button
-                                                key={k}
-                                                type="button"
-                                                role="tab"
-                                                aria-selected={mode === k}
-                                                onClick={() => switchMode(k)}
-                                                className={[
-                                                    'px-3 py-1 rounded-md border-0 text-xs font-medium cursor-pointer',
-                                                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                                                    mode === k ? 'bg-card text-foreground shadow-xs' : 'bg-transparent text-muted-foreground',
-                                                ].join(' ')}
-                                            >
-                                                {k === 'workspaces' ? 'Workspaces' : 'Deployments'}
-                                            </button>
-                                        ))}
-                                    </div>
+                                    <SegmentedControl
+                                        aria-label="View"
+                                        className="bg-muted"
+                                        value={mode}
+                                        onValueChange={(v) => switchMode(v as Mode)}
+                                        options={[
+                                            { value: 'workspaces', label: 'Workspaces' },
+                                            { value: 'deployments', label: 'Deployments' },
+                                        ]}
+                                    />
                                 )}
                             </div>
                         </div>
@@ -348,23 +344,15 @@ const WsBody: React.FC<{
     onSelectWorkspace?: (id: string) => void;
 }> = ({ problems, healthy, onSelectWorkspace }) => {
     const Head = () => (
-        <thead>
-            <tr style={{ background: 'var(--muted)' }}>
+        <TableHeader>
+            <TableRow style={{ background: 'var(--muted)' }}>
                 {['Severity', 'Workspace', 'Cause', 'Last seen'].map((h, i) => (
-                    <th
-                        key={h}
-                        style={{
-                            textAlign: 'left', padding: '9px 14px',
-                            fontSize: 11, fontWeight: 500, color: 'var(--muted-foreground)',
-                            borderBottom: '1px solid var(--border)',
-                            width: [150, undefined, 230, 130][i],
-                        }}
-                    >
+                    <TableHead key={h} style={{ width: [150, undefined, 230, 130][i] }}>
                         {h}
-                    </th>
+                    </TableHead>
                 ))}
-            </tr>
-        </thead>
+            </TableRow>
+        </TableHeader>
     );
 
     const Rows = ({ list, neutral }: { list: Workspace[]; neutral?: boolean }) => {
@@ -379,7 +367,7 @@ const WsBody: React.FC<{
                 const isHovered = hoveredId === w.id;
                 const clickable = !!onSelectWorkspace;
                 return (
-                    <tr
+                    <TableRow
                         key={w.id}
                         role={clickable ? 'link' : undefined}
                         tabIndex={clickable ? 0 : undefined}
@@ -400,8 +388,8 @@ const WsBody: React.FC<{
                             transition: 'background 0.1s',
                         }}
                     >
-                        <td style={{ padding: '11px 14px' }}><ShadSevBadge k={cl.k} soft={!neutral} /></td>
-                        <td style={{ padding: '11px 14px' }}>
+                        <TableCell style={{ padding: '11px 14px' }}><ShadSevBadge k={cl.k} soft={!neutral} /></TableCell>
+                        <TableCell style={{ padding: '11px 14px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <ShadTierBadge t={cust.tier} className="h-[18px] px-1.5 text-[10px]" />
                                 <span className="font-semibold text-[13.5px]">{cust.name}</span>
@@ -410,8 +398,8 @@ const WsBody: React.FC<{
                             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted-foreground)', marginTop: 3 }}>
                                 {w.id} · {fCloudName(w.cloud)} · {w.region} · sgp {w.sgp}
                             </div>
-                        </td>
-                        <td style={{ padding: '11px 14px' }}>
+                        </TableCell>
+                        <TableCell style={{ padding: '11px 14px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                                 <Icon
                                     style={{ width: 14, height: 14, color: neutral ? 'var(--muted-foreground)' : SHAD_SEV[cl.k].dot }}
@@ -419,14 +407,14 @@ const WsBody: React.FC<{
                                 />
                                 <span className="text-xs" style={{ color: neutral ? 'var(--muted-foreground)' : 'var(--foreground)' }}>{fiReason(w, cl.k)}</span>
                             </div>
-                        </td>
-                        <td style={{
+                        </TableCell>
+                        <TableCell style={{
                             padding: '11px 14px', fontFamily: 'var(--font-mono)', fontSize: 12,
                             color: cl.stale && !neutral ? SHAD_SEV[cl.k].fg : 'var(--muted-foreground)',
                         }}>
                             {stale.label}
-                        </td>
-                    </tr>
+                        </TableCell>
+                    </TableRow>
                 );
             })}
         </>
@@ -444,12 +432,12 @@ const WsBody: React.FC<{
                         <h2 className="text-[15px] font-semibold m-0">Needs attention</h2>
                         <Badge variant="secondary" className="font-mono">{problems.length}</Badge>
                     </div>
-                    <div className="border border-border rounded-xl overflow-hidden shadow-sm">
-                        <table className="w-full border-collapse text-sm">
+                    <Card className="overflow-hidden">
+                        <Table>
                             <Head />
-                            <tbody><Rows list={problems} /></tbody>
-                        </table>
-                    </div>
+                            <TableBody><Rows list={problems} /></TableBody>
+                        </Table>
+                    </Card>
                 </div>
             )}
             {healthy.length > 0 && (
@@ -458,12 +446,12 @@ const WsBody: React.FC<{
                         <h2 className="text-[15px] font-semibold m-0 text-muted-foreground">Healthy</h2>
                         <Badge variant="outline" className="font-mono text-muted-foreground">{healthy.length}</Badge>
                     </div>
-                    <div className="border border-border rounded-xl overflow-hidden shadow-sm">
-                        <table className="w-full border-collapse text-sm">
+                    <Card className="overflow-hidden">
+                        <Table>
                             <Head />
-                            <tbody><Rows list={healthy} neutral /></tbody>
-                        </table>
-                    </div>
+                            <TableBody><Rows list={healthy} neutral /></TableBody>
+                        </Table>
+                    </Card>
                 </div>
             )}
         </>
@@ -488,18 +476,16 @@ const DepBody: React.FC<{ rows: Deployment[]; onSelectWorkspace?: (id: string) =
     const DepTable: React.FC<{ list: Deployment[] }> = ({ list }) => {
         const [hoveredKey, setHoveredKey] = useState<string | null>(null);
         return (
-        <div className="border border-border overflow-hidden shadow-sm">
-            <table className="w-full border-collapse text-sm">
-                <thead>
-                    <tr className="bg-muted">
+        <Card className="rounded-none overflow-hidden">
+            <Table>
+                <TableHeader>
+                    <TableRow className="bg-muted">
                         {['Customer', 'Workspace', 'Env', 'Cloud', 'Pack', 'Image tag', 'Reps', 'Status'].map(h => (
-                            <th key={h} scope="col" className="text-left px-3.5 py-2 text-[11px] font-medium text-muted-foreground border-b border-border whitespace-nowrap">
-                                {h}
-                            </th>
+                            <TableHead key={h}>{h}</TableHead>
                         ))}
-                    </tr>
-                </thead>
-                <tbody>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
                     {list.map((d, i) => {
                         const cust = fCustomer(d.customer);
                         const rowKey = `${d.workspace}-${d.pack}`;
@@ -507,7 +493,7 @@ const DepBody: React.FC<{ rows: Deployment[]; onSelectWorkspace?: (id: string) =
                         const health = DEP_STATUS_HEALTH[d.status];
                         const clickable = !!onSelectWorkspace;
                         return (
-                            <tr
+                            <TableRow
                                 key={rowKey}
                                 role={clickable ? 'link' : undefined}
                                 tabIndex={clickable ? 0 : undefined}
@@ -528,35 +514,35 @@ const DepBody: React.FC<{ rows: Deployment[]; onSelectWorkspace?: (id: string) =
                                     transition: 'background 0.1s',
                                 }}
                             >
-                                <td style={{ padding: '10px 14px' }}>
+                                <TableCell style={{ padding: '10px 14px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                                         <ShadTierBadge t={cust.tier} className="h-[18px] px-1.5 text-[10px]" />
                                         <span className="font-medium">{cust.name}</span>
                                     </div>
-                                </td>
-                                <td className="px-3.5 py-2.5 font-mono text-[11.5px] text-muted-foreground">{d.workspace}</td>
-                                <td className="px-3.5 py-2.5">
+                                </TableCell>
+                                <TableCell className="px-3.5 py-2.5 font-mono text-[11.5px] text-muted-foreground">{d.workspace}</TableCell>
+                                <TableCell className="px-3.5 py-2.5">
                                     <Badge variant="secondary" className="h-[18px] px-1.5 text-[10px] uppercase tracking-wider">{d.env}</Badge>
-                                </td>
-                                <td style={{ padding: '10px 14px', fontSize: 12 }}>{fCloudName(d.cloud)}</td>
-                                <td style={{ padding: '10px 14px', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 500 }}>{d.pack}</td>
-                                <td style={{ padding: '10px 14px', fontFamily: 'var(--font-mono)', fontSize: 12 }}>{d.image}</td>
-                                <td style={{ padding: '10px 14px', fontFamily: 'var(--font-mono)', fontSize: 12 }}>{d.replicas}</td>
-                                <td style={{ padding: '10px 14px' }}><ShadSevBadge k={DEP_STATUS_HEALTH[d.status]} soft /></td>
-                            </tr>
+                                </TableCell>
+                                <TableCell style={{ padding: '10px 14px', fontSize: 12 }}>{fCloudName(d.cloud)}</TableCell>
+                                <TableCell style={{ padding: '10px 14px', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 500 }}>{d.pack}</TableCell>
+                                <TableCell style={{ padding: '10px 14px', fontFamily: 'var(--font-mono)', fontSize: 12 }}>{d.image}</TableCell>
+                                <TableCell style={{ padding: '10px 14px', fontFamily: 'var(--font-mono)', fontSize: 12 }}>{d.replicas}</TableCell>
+                                <TableCell style={{ padding: '10px 14px' }}><ShadSevBadge k={DEP_STATUS_HEALTH[d.status]} soft /></TableCell>
+                            </TableRow>
                         );
                     })}
-                </tbody>
-            </table>
-        </div>
+                </TableBody>
+            </Table>
+        </Card>
         );
     };
 
     return (
         <>
-            <section
+            <Card
                 aria-label="Image tag distribution"
-                className="border border-border bg-card shadow-sm px-4 py-4 mb-5"
+                className="rounded-none px-4 py-4 mb-5"
             >
                 <h3 className="text-sm font-semibold m-0 mb-0.5">Image tag distribution</h3>
                 <p className="text-xs text-muted-foreground m-0 mb-4">
@@ -565,7 +551,12 @@ const DepBody: React.FC<{ rows: Deployment[]; onSelectWorkspace?: (id: string) =
                 <div className="flex flex-col gap-3.5">
                     {tags.map(([img, n]) => (
                         <div key={img} className="grid items-center gap-3.5" style={{ gridTemplateColumns: '230px 70px 1fr' }}>
-                            <span className="font-mono text-xs whitespace-nowrap overflow-hidden text-ellipsis">{img}</span>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <span className="font-mono text-xs whitespace-nowrap overflow-hidden text-ellipsis cursor-default">{img}</span>
+                                </TooltipTrigger>
+                                <TooltipContent className="font-mono">{img}</TooltipContent>
+                            </Tooltip>
                             <span className="font-mono text-xs text-muted-foreground">{n} ws</span>
                             <div className="h-2.5 bg-muted overflow-hidden">
                                 <div className="h-full" style={{ width: `${(n / tagMax) * 100}%`, ...hatchStyle() }} />
@@ -573,7 +564,7 @@ const DepBody: React.FC<{ rows: Deployment[]; onSelectWorkspace?: (id: string) =
                         </div>
                     ))}
                 </div>
-            </section>
+            </Card>
 
             {problems.length > 0 && (
                 <div className="mb-6">
@@ -668,9 +659,9 @@ const ErrorChart: React.FC = () => {
     const xStep = Math.max(1, Math.ceil(n / 6));
 
     return (
-        <section
+        <Card
             aria-label="Errors over time"
-            className="border border-border rounded-xl bg-card shadow-sm mb-5"
+            className="mb-5"
         >
             <header className="flex items-center gap-3.5 px-4 pt-3.5 pb-2">
                 <div className="flex flex-col gap-0.5">
@@ -691,25 +682,17 @@ const ErrorChart: React.FC = () => {
                         </span>
                     ))}
                 </div>
-                <div role="tablist" aria-label="Chart time range" className="inline-flex bg-muted rounded-lg p-[3px] gap-0.5">
-                    {(['6h', '24h', '7d'] as const).map(rr => (
-                        <button
-                            key={rr}
-                            type="button"
-                            role="tab"
-                            aria-selected={range === rr}
-                            aria-label={`Show last ${rr === '6h' ? '6 hours' : rr === '24h' ? '24 hours' : '7 days'}`}
-                            onClick={() => { setRange(rr); setHover(null); }}
-                            className={cn(
-                                'px-2.5 py-1 rounded-md border-0 text-xs font-medium cursor-pointer',
-                                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                                range === rr ? 'bg-card text-foreground shadow-sm' : 'bg-transparent text-muted-foreground',
-                            )}
-                        >
-                            {rr}
-                        </button>
-                    ))}
-                </div>
+                <SegmentedControl
+                    aria-label="Chart time range"
+                    className="bg-muted"
+                    value={range}
+                    onValueChange={(v) => { setRange(v as '6h' | '24h' | '7d'); setHover(null); }}
+                    options={[
+                        { value: '6h', label: '6h' },
+                        { value: '24h', label: '24h' },
+                        { value: '7d', label: '7d' },
+                    ]}
+                />
             </header>
             <div className="px-2 pb-2 h-[180px]">
                 <ResponsiveContainer width="100%" height="100%">
@@ -737,7 +720,7 @@ const ErrorChart: React.FC = () => {
                             axisLine={false}
                             width={28}
                         />
-                        <Tooltip
+                        <RechartsTooltip
                             cursor={{ stroke: 'var(--foreground)', strokeOpacity: 0.4 }}
                             content={<EmptyTooltip />}
                         />
@@ -771,7 +754,7 @@ const ErrorChart: React.FC = () => {
                     </AreaChart>
                 </ResponsiveContainer>
             </div>
-        </section>
+        </Card>
     );
 };
 

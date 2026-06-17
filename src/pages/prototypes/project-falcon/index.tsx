@@ -5,6 +5,7 @@
 
 import React, { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { combinedCSSVariables } from '@/lib/theme';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { usePrototypeConfig, PrototypeConfig } from '@/lib/config';
 import { useTweakpane } from '@/lib/tweakpane';
 import { SHAD_VARS_DARK, SHAD_VARS_LIGHT } from './shared';
@@ -15,6 +16,7 @@ import { CustomerCatalog } from './CustomerCatalog';
 import { CustomerDetail } from './CustomerDetail';
 import { DeploymentSearch } from './DeploymentSearch';
 import { FIBrowse } from './FIBrowse';
+import { downloadFalconHandoff } from './downloadHandoff';
 
 const FORCE_THEME_STYLE_ID = 'force-theme-project-falcon';
 const themeSheetCache: Record<'light' | 'dark', string> = { light: '', dark: '' };
@@ -73,11 +75,21 @@ const ProjectFalcon: React.FC = () => {
     // host-level theme stylesheet and the SHAD_VARS applied to the prototype
     // root, keeping the two in sync.
     const { params } = useTweakpane(
-        { darkMode: false },
-        { darkMode: { label: 'Dark mode' } },
+        { theme: 'light' },
+        { theme: { label: 'Theme', options: { Light: 'light', Dark: 'dark' } } },
+        {
+            alwaysVisible: true,
+            buttons: [
+                {
+                    title: 'Download .zip',
+                    label: 'Handoff',
+                    onClick: downloadFalconHandoff,
+                },
+            ],
+        },
     );
-    const darkMode = params.darkMode as boolean;
-    const mode: 'light' | 'dark' = darkMode ? 'dark' : 'light';
+    const mode: 'light' | 'dark' = params.theme === 'dark' ? 'dark' : 'light';
+    const darkMode = mode === 'dark';
 
     // Force the chosen theme on the host (the host theme may be the opposite).
     // Re-runs when the toggle flips so the stylesheet swaps in place.
@@ -195,15 +207,17 @@ const ProjectFalcon: React.FC = () => {
             className="h-screen flex bg-background text-foreground"
             style={darkMode ? SHAD_VARS_DARK : SHAD_VARS_LIGHT}
         >
-            <NavShell
-                section={section}
-                items={navItems}
-                onNavigate={handleNavigate}
-                brandColor={brandColor}
-                logoStyle={logoStyle}
-            >
-                {renderBody()}
-            </NavShell>
+            <TooltipProvider delayDuration={300}>
+                <NavShell
+                    section={section}
+                    items={navItems}
+                    onNavigate={handleNavigate}
+                    brandColor={brandColor}
+                    logoStyle={logoStyle}
+                >
+                    {renderBody()}
+                </NavShell>
+            </TooltipProvider>
         </div>
     );
 };

@@ -6,7 +6,8 @@ import React, { useMemo, useState } from 'react';
 import { Search, User, Mail, ChevronRight, FilterX } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { cn } from '@/lib/utils';
+import { Card } from '@/components/ui/card';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 import {
     ShadTierBadge, ShadSummaryPill, SlackLogo,
 } from './shared';
@@ -84,24 +85,16 @@ export const CustomerCatalog: React.FC<CustomerCatalogProps> = ({ onSelectCustom
                     </div>
                     <div className="flex items-center gap-2.5">
                         <span id="sort-label" className="text-sm text-muted-foreground">Sort by</span>
-                        <div role="radiogroup" aria-labelledby="sort-label" className="inline-flex bg-muted rounded-lg p-[3px] gap-0.5">
-                            {([['priority', 'Priority'], ['alphabetical', 'Alphabetical']] as Array<[SortKey, string]>).map(([k, l]) => (
-                                <button
-                                    key={k}
-                                    type="button"
-                                    role="radio"
-                                    aria-checked={sort === k}
-                                    onClick={() => setSort(k)}
-                                    className={cn(
-                                        'px-3 py-1 rounded-md border-0 text-xs font-medium cursor-pointer',
-                                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                                        sort === k ? 'bg-card text-foreground shadow-sm' : 'bg-transparent text-muted-foreground',
-                                    )}
-                                >
-                                    {l}
-                                </button>
-                            ))}
-                        </div>
+                        <SegmentedControl
+                            aria-label="Sort customers"
+                            className="bg-muted"
+                            value={sort}
+                            onValueChange={(v) => setSort(v as SortKey)}
+                            options={[
+                                { value: 'priority', label: 'Priority' },
+                                { value: 'alphabetical', label: 'Alphabetical' },
+                            ]}
+                        />
                     </div>
                 </div>
             </header>
@@ -118,13 +111,20 @@ export const CustomerCatalog: React.FC<CustomerCatalogProps> = ({ onSelectCustom
                     {filtered.map(c => {
                         const allHealthy = c.fail + c.deg + c.stl === 0;
                         return (
-                            <button
+                            <Card
                                 key={c.id}
-                                type="button"
+                                role="button"
+                                tabIndex={0}
                                 onClick={() => onSelectCustomer(c.id)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        onSelectCustomer(c.id);
+                                    }
+                                }}
                                 aria-label={`Open ${c.name}, ${c.tier}, ${c.wsCount} workspaces`}
                                 style={{ borderRadius: 4 }}
-                                className="border border-border bg-card shadow-sm flex flex-col text-left p-4 pb-0 cursor-pointer transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                                className="flex flex-col text-left p-4 pb-0 cursor-pointer transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                             >
                                 <div className="flex items-start justify-between gap-2.5 mb-3">
                                     <div className="text-base font-semibold tracking-tight">{c.name}</div>
@@ -153,7 +153,7 @@ export const CustomerCatalog: React.FC<CustomerCatalogProps> = ({ onSelectCustom
                                         {c.stl > 0 && <ShadSummaryPill k="stale" label={`${c.stl} stale`} />}
                                     </div>
                                 </div>
-                            </button>
+                            </Card>
                         );
                     })}
                 </div>

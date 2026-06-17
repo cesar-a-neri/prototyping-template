@@ -39,6 +39,12 @@ export function useTweakpane<
         alwaysVisible?: boolean;
         debugParams?: D;
         debugBindingOptions?: BindingOptions;
+        /**
+         * Action buttons appended below the bindings. Handlers should be stable
+         * (the pane captures them at creation); avoid closing over changing
+         * state. Useful for one-shot actions like exporting/downloading.
+         */
+        buttons?: Array<{ title: string; label?: string; onClick: () => void }>;
     },
 ): { params: T & D } {
     const alwaysVisible = hookOptions?.alwaysVisible ?? false;
@@ -131,6 +137,10 @@ export function useTweakpane<
             });
         }
 
+        for (const btn of hookOptions?.buttons ?? []) {
+            pane.addButton({ title: btn.title, label: btn.label ?? '' }).on('click', () => btn.onClick());
+        }
+
         pane.element.style.display = (alwaysVisible || debugMode) ? '' : 'none';
         const cleanupDrag = attachDrag(pane);
 
@@ -182,6 +192,10 @@ export function useTweakpane<
                     setParams({ ...baseValuesRef.current, ...debugValuesRef.current } as T & D);
                 });
             }
+        }
+
+        for (const btn of hookOptions?.buttons ?? []) {
+            pane.addButton({ title: btn.title, label: btn.label ?? '' }).on('click', () => btn.onClick());
         }
 
         pane.element.style.display = (alwaysVisible || debugMode) ? '' : 'none';

@@ -6,7 +6,9 @@ import React, { useState } from 'react';
 import { ChevronRight, ArrowUpRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { Card } from '@/components/ui/card';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import {
     SHAD_SEV,
     ShadSevBadge, ShadTierBadge, ShadKV, ShadSummaryPill,
@@ -61,24 +63,34 @@ export const CustomerDetail: React.FC<CustomerDetailProps> = ({ customerId, onBa
                     Customer {idx + 1} of {customers.length}
                 </span>
                 <div className="flex gap-1">
-                    <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => step(-1)}
-                        aria-label="Previous customer"
-                        className="size-7"
-                    >
-                        <ChevronRight aria-hidden="true" className="size-3.5 rotate-180" strokeWidth={2} />
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => step(1)}
-                        aria-label="Next customer"
-                        className="size-7"
-                    >
-                        <ChevronRight aria-hidden="true" className="size-3.5" strokeWidth={2} />
-                    </Button>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => step(-1)}
+                                aria-label="Previous customer"
+                                className="size-7"
+                            >
+                                <ChevronRight aria-hidden="true" className="size-3.5 rotate-180" strokeWidth={2} />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Previous customer</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => step(1)}
+                                aria-label="Next customer"
+                                className="size-7"
+                            >
+                                <ChevronRight aria-hidden="true" className="size-3.5" strokeWidth={2} />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Next customer</TooltipContent>
+                    </Tooltip>
                 </div>
             </nav>
 
@@ -124,14 +136,14 @@ export const CustomerDetail: React.FC<CustomerDetailProps> = ({ customerId, onBa
 
             {/* body */}
             <div className="flex-1 overflow-auto px-6 pt-5 pb-7 flex flex-col gap-5">
-                <div className="border border-border rounded-xl overflow-hidden border-b-0 border-r-0">
+                <Card className="overflow-hidden border-b-0 border-r-0 shadow-none">
                     <div className="grid grid-cols-4">
                         <ShadKV k="Customer priority" v={c.tier} mono />
                         <ShadKV k="Workspaces" v={ws.length} mono />
                         <ShadKV k="Packs installed" v={packs} mono />
                         <ShadKV k="Nodes" v={nodes} mono />
                     </div>
-                </div>
+                </Card>
 
                 <div>
                     <div className="flex items-baseline justify-between mb-2.5">
@@ -157,24 +169,22 @@ const HOVER_TINT: Record<string, string> = {
 const WorkspaceTable: React.FC<{ rows: Workspace[]; onSelectWorkspace: (id: string) => void }> = ({ rows, onSelectWorkspace }) => {
     const [hoveredId, setHoveredId] = useState<string | null>(null);
     return (
-    <div className="border border-border rounded-xl overflow-hidden shadow-sm">
-        <table className="w-full border-collapse text-sm">
-            <thead>
-                <tr className="bg-muted">
+    <Card className="overflow-hidden">
+        <Table>
+            <TableHeader>
+                <TableRow className="bg-muted">
                     {['Workspace', 'Env', 'Cloud · Region', 'SGP', 'Packs', 'Nodes', 'Heartbeat', 'Status'].map(h => (
-                        <th key={h} scope="col" className="text-left px-3.5 py-2 text-[11px] font-medium text-muted-foreground border-b border-border whitespace-nowrap">
-                            {h}
-                        </th>
+                        <TableHead key={h}>{h}</TableHead>
                     ))}
-                </tr>
-            </thead>
-            <tbody>
-                {rows.map((w, i) => {
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {rows.map((w) => {
                     const cl = fiClass(w);
                     const stale = fStaleness(w.lastHeartbeat);
                     const isHovered = hoveredId === w.id;
                     return (
-                        <tr
+                        <TableRow
                             key={w.id}
                             role="link"
                             tabIndex={0}
@@ -188,35 +198,32 @@ const WorkspaceTable: React.FC<{ rows: Workspace[]; onSelectWorkspace: (id: stri
                             }}
                             onMouseEnter={() => setHoveredId(w.id)}
                             onMouseLeave={() => setHoveredId(null)}
-                            className={cn(
-                                'cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
-                                i < rows.length - 1 && 'border-b border-border',
-                            )}
+                            className="cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
                             style={{ background: isHovered ? HOVER_TINT[cl.k] : SHAD_SEV[cl.k].tint }}
                         >
-                            <td className="px-3.5 py-2.5 font-mono text-[12.5px]">{w.id}</td>
-                            <td className="px-3.5 py-2.5">
+                            <TableCell className="font-mono text-[12.5px]">{w.id}</TableCell>
+                            <TableCell>
                                 <Badge variant="secondary" className="h-[18px] px-1.5 text-[10px] uppercase tracking-wider">{w.env}</Badge>
-                            </td>
-                            <td className="px-3.5 py-2.5 text-[12.5px]">
+                            </TableCell>
+                            <TableCell className="text-[12.5px]">
                                 {fCloudName(w.cloud)} <span className="text-zinc-300" aria-hidden="true">·</span>{' '}
                                 <span className="font-mono text-muted-foreground">{w.region}</span>
-                            </td>
-                            <td className="px-3.5 py-2.5 font-mono text-xs">{w.sgp}</td>
-                            <td className="px-3.5 py-2.5 font-mono text-xs">{w.packs}</td>
-                            <td className="px-3.5 py-2.5 font-mono text-xs">{w.nodes}</td>
-                            <td
-                                className="px-3.5 py-2.5 font-mono text-xs"
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">{w.sgp}</TableCell>
+                            <TableCell className="font-mono text-xs">{w.packs}</TableCell>
+                            <TableCell className="font-mono text-xs">{w.nodes}</TableCell>
+                            <TableCell
+                                className="font-mono text-xs"
                                 style={{ color: cl.stale ? SHAD_SEV[cl.k].fg : undefined }}
                             >
                                 {stale.label}
-                            </td>
-                            <td className="px-3.5 py-2.5"><ShadSevBadge k={cl.k} soft /></td>
-                        </tr>
+                            </TableCell>
+                            <TableCell><ShadSevBadge k={cl.k} soft /></TableCell>
+                        </TableRow>
                     );
                 })}
-            </tbody>
-        </table>
-    </div>
+            </TableBody>
+        </Table>
+    </Card>
     );
 };
