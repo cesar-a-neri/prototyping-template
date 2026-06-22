@@ -107,27 +107,23 @@ export const WorkspaceDetail: React.FC<WorkspaceDetailProps> = ({ workspaceId, o
         <div className="w-full h-full flex flex-col">
             {/* top bar */}
             <nav aria-label="Breadcrumb" className="flex items-center gap-2.5 h-10 px-6 border-b border-border shrink-0">
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={onBack}
-                    aria-label="Back to fleet"
-                    className="h-6 px-1.5 text-muted-foreground"
-                >
-                    <ChevronRight aria-hidden="true" className="size-3.5 rotate-180" strokeWidth={2} /> Fleet
-                </Button>
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <button
+                        onClick={onBack}
+                        aria-label="Back to fleet"
+                        className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+                    >
+                        Fleet
+                    </button>
                     <ChevronRight aria-hidden="true" className="size-3" strokeWidth={2} />
                     {onSelectCustomer ? (
-                        <Button
-                            variant="ghost"
-                            size="sm"
+                        <button
                             onClick={() => onSelectCustomer(w.customer)}
                             aria-label={`View customer ${cust.name}`}
-                            className="h-6 px-1.5 text-muted-foreground"
+                            className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
                         >
                             {cust.name}
-                        </Button>
+                        </button>
                     ) : (
                         <span>{cust.name}</span>
                     )}

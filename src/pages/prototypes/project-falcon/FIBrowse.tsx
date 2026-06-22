@@ -244,7 +244,7 @@ export const FIBrowse: React.FC<FIBrowseProps> = ({
                         </div>
                     </div>
 
-                    <div style={{ flex: 1, overflow: 'auto', padding: '0 24px 28px' }}>
+                    <div style={{ flex: 1, overflow: 'auto', padding: '1px 24px 28px' }}>
                         {mode === 'workspaces' ? (
                             <WsBody problems={problems} healthy={healthy} onSelectWorkspace={onSelectWorkspace} />
                         ) : (
